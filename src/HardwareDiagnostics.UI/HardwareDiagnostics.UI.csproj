@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\HardwareDiagnostics.Core\HardwareDiagnostics.Core.csproj" />
+    <ProjectReference Include="..\HardwareDiagnostics.Hardware\HardwareDiagnostics.Hardware.csproj" />
+    <ProjectReference Include="..\HardwareDiagnostics.System\HardwareDiagnostics.System.csproj" />
+    <ProjectReference Include="..\HardwareDiagnostics.Monitoring\HardwareDiagnostics.Monitoring.csproj" />
+    <ProjectReference Include="..\HardwareDiagnostics.Security\HardwareDiagnostics.Security.csproj" />
+    <Reference Include="System.Management" />
+    <Reference Include="Microsoft.VisualBasic" />
+  </ItemGroup>
+</Project>

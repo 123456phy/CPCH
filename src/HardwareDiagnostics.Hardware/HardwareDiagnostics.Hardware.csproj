@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\HardwareDiagnostics.Core\HardwareDiagnostics.Core.csproj" />
+    <Reference Include="System.Management" />
+    <Reference Include="System.ServiceProcess" />
+  </ItemGroup>
+</Project>

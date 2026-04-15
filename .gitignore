@@ -1,0 +1,28 @@
+## 编译输出
+bin/
+obj/
+publish/
+BuildOutput/
+
+## 用户特定文件
+*.user
+*.suo
+.vs/
+
+## 日志文件
+*.log
+SecurityLogs/
+
+## 临时文件
+*.tmp
+*.temp
+
+## IDE 文件
+.idea/
+*.swp
+*.swo
+*~
+
+## 操作系统文件
+.DS_Store
+Thumbs.db

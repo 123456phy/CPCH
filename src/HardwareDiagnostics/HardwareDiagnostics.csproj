@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <!-- <ApplicationIcon>app.ico</ApplicationIcon> -->
+    <AssemblyTitle>硬件检测与系统维护工具</AssemblyTitle>
+    <AssemblyDescription>此软件由 furry 皓予 vibe coding</AssemblyDescription>
+    <AssemblyCompany>furry 皓予</AssemblyCompany>
+    <AssemblyProduct>硬件检测与系统维护工具</AssemblyProduct>
+    <AssemblyCopyright>Copyright © 2026 furry 皓予</AssemblyCopyright>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\HardwareDiagnostics.Core\HardwareDiagnostics.Core.csproj" />
+    <ProjectReference Include="..\HardwareDiagnostics.Hardware\HardwareDiagnostics.Hardware.csproj" />
+    <ProjectReference Include="..\HardwareDiagnostics.System\HardwareDiagnostics.System.csproj" />
+    <ProjectReference Include="..\HardwareDiagnostics.Monitoring\HardwareDiagnostics.Monitoring.csproj" />
+    <ProjectReference Include="..\HardwareDiagnostics.UI\HardwareDiagnostics.UI.csproj" />
+    <Reference Include="System.Management" />
+  </ItemGroup>
+</Project>
