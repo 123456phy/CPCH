@@ -4,11 +4,14 @@
 
 **一个功能强大的 Windows 系统诊断和维护工具集**
 
-此软件由庞皓予 vibe coding
+此软件由 furry 皓予 vibe coding
 
 [![.NET Framework](https://img.shields.io/badge/.NET%20Framework-4.8+-blue.svg)](https://dotnet.microsoft.com/download/dotnet-framework)
 [![Platform](https://img.shields.io/badge/platform-Windows%20XP%2B-lightgrey.svg)](https://www.microsoft.com/windows)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/123456phy/CPCH)](https://github.com/123456phy/CPCH/releases)
+
+### 🚀 [立即下载最新版本](https://github.com/123456phy/CPCH/releases/latest)
 
 </div>
 
