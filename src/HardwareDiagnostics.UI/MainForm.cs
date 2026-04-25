@@ -809,6 +809,21 @@ namespace HardwareDiagnostics.UI
             btnDismTutorial.Click += (s, e) => ShowDismTutorial();
             layout.Controls.Add(btnDismTutorial, 2, 3);
 
+            // 垃圾清理按钮
+            var btnSystemCleaner = new Button
+            {
+                Text = "垃圾清理 🗑️",
+                Dock = DockStyle.Fill,
+                Font = new Font("Microsoft YaHei", 11F),
+                BackColor = Color.LightCyan
+            };
+            btnSystemCleaner.Click += (s, e) =>
+            {
+                using var form = new SystemCleanerForm();
+                form.ShowDialog(this);
+            };
+            layout.Controls.Add(btnSystemCleaner, 0, 4);
+
             page.Controls.Add(layout);
             return page;
         }
@@ -1196,21 +1211,22 @@ namespace HardwareDiagnostics.UI
 
         private void ShowDismTutorial()
         {
-            var tutorial = DismTutorial.GetIntroduction();
-            var tutorialItems = DismTutorial.GetTutorials();
-            var scenarios = DismTutorial.GetCommonScenarios();
+            var tutorial = DismTutorialV2.GetIntroduction();
+            var tutorialItems = DismTutorialV2.GetTutorials();
+            var scenarios = DismTutorialV2.GetCommonScenarios();
+            var quickRef = DismTutorialV2.GetQuickReference();
 
             var form = new Form
             {
-                Text = "DISM 新手教程",
-                Size = new Size(900, 700),
+                Text = "DISM 新手教程 V2 - 更人性化的系统修复指南",
+                Size = new Size(1000, 750),
                 StartPosition = FormStartPosition.CenterParent
             };
 
             var tabControl = new TabControl { Dock = DockStyle.Fill };
 
             // 简介标签页
-            var introTab = new TabPage("简介");
+            var introTab = new TabPage("📖 简介");
             var introTextBox = new TextBox
             {
                 Text = tutorial,
@@ -1224,7 +1240,7 @@ namespace HardwareDiagnostics.UI
             tabControl.TabPages.Add(introTab);
 
             // 命令列表标签页
-            var commandsTab = new TabPage("命令列表");
+            var commandsTab = new TabPage("🔧 命令详解");
             var commandListView = new ListView
             {
                 Dock = DockStyle.Fill,
@@ -1232,17 +1248,17 @@ namespace HardwareDiagnostics.UI
                 FullRowSelect = true,
                 GridLines = true
             };
-            commandListView.Columns.Add("分类", 120);
-            commandListView.Columns.Add("名称", 150);
-            commandListView.Columns.Add("命令", 300);
-            commandListView.Columns.Add("说明", 200);
+            commandListView.Columns.Add("分类", 150);
+            commandListView.Columns.Add("功能", 250);
+            commandListView.Columns.Add("命令", 350);
+            commandListView.Columns.Add("耗时", 100);
 
             foreach (var item in tutorialItems)
             {
                 var listViewItem = new ListViewItem(item.Category);
                 listViewItem.SubItems.Add(item.Title);
                 listViewItem.SubItems.Add(item.Command);
-                listViewItem.SubItems.Add(item.Description);
+                listViewItem.SubItems.Add(item.Duration);
                 listViewItem.Tag = item;
                 commandListView.Items.Add(listViewItem);
             }
@@ -1252,10 +1268,23 @@ namespace HardwareDiagnostics.UI
                 if (commandListView.SelectedItems.Count > 0)
                 {
                     var selectedItem = commandListView.SelectedItems[0];
-                    if (selectedItem.Tag is DismTutorialItem tutorialItem)
+                    if (selectedItem.Tag is DismTutorialItemV2 tutorialItem)
                     {
-                        var details = $"用途：{tutorialItem.Usage}\n\n执行时间：{tutorialItem.Duration}\n风险等级：{tutorialItem.RiskLevel}";
-                        MessageBox.Show(details, "详细信息", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        var details = new StringBuilder();
+                        details.AppendLine($"📝 {tutorialItem.Title}");
+                        details.AppendLine();
+                        details.AppendLine($"📋 说明：{tutorialItem.Description}");
+                        details.AppendLine();
+                        details.AppendLine($"🤔 什么时候用：");
+                        details.AppendLine(tutorialItem.WhenToUse);
+                        details.AppendLine();
+                        details.AppendLine($"⏱️ 执行时间：{tutorialItem.Duration}");
+                        details.AppendLine($"⚠️ 风险等级：{tutorialItem.RiskLevel}");
+                        details.AppendLine();
+                        details.AppendLine($"💡 使用建议：");
+                        details.AppendLine(tutorialItem.TroubleshootingTips);
+
+                        MessageBox.Show(details.ToString(), "详细说明", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }
             };
@@ -1263,8 +1292,8 @@ namespace HardwareDiagnostics.UI
             commandsTab.Controls.Add(commandListView);
             tabControl.TabPages.Add(commandsTab);
 
-            // 使用场景标签页
-            var scenariosTab = new TabPage("使用场景");
+            // 疑难杂症标签页
+            var scenariosTab = new TabPage("🚑 疑难杂症");
             var scenariosTextBox = new TextBox
             {
                 Text = scenarios,
@@ -1276,6 +1305,20 @@ namespace HardwareDiagnostics.UI
             };
             scenariosTab.Controls.Add(scenariosTextBox);
             tabControl.TabPages.Add(scenariosTab);
+
+            // 快速参考标签页
+            var quickRefTab = new TabPage("📋 快速参考");
+            var quickRefTextBox = new TextBox
+            {
+                Text = quickRef,
+                Dock = DockStyle.Fill,
+                Multiline = true,
+                ReadOnly = true,
+                ScrollBars = ScrollBars.Vertical,
+                Font = new Font("Consolas", 10F)
+            };
+            quickRefTab.Controls.Add(quickRefTextBox);
+            tabControl.TabPages.Add(quickRefTab);
 
             form.Controls.Add(tabControl);
             form.ShowDialog(this);

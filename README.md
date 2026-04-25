@@ -524,7 +524,7 @@ dotnet build HardwareDiagnostics.sln
 
 ## 📞 联系方式
 
-- **作者**: 庞皓予
+- **作者**: furry 皓予
 - **开发方式**: vibe coding
 - **项目主页**: [GitHub/Gitee 仓库链接]
 
@@ -540,6 +540,6 @@ dotnet build HardwareDiagnostics.sln
 
 **如果这个项目对您有帮助，请给一个 ⭐ Star！**
 
-Made with ❤️ by 庞皓予
+Made with ❤️ by furry 皓予
 
 </div>

@@ -147,7 +147,7 @@ namespace HardwareDiagnostics.Core.Utils
             }
         }
 
-        private bool IsUselessProcess(ProcessInfo processInfo)
+        private bool IsUselessProcess(RamProcessInfo processInfo)
         {
             // 判断进程是否无用的逻辑
             // 1. 不是系统关键进程
@@ -215,9 +215,9 @@ namespace HardwareDiagnostics.Core.Utils
             }
         }
 
-        private List<ProcessInfo> GetHighMemoryProcesses(long totalMemory)
+        private List<RamProcessInfo> GetHighMemoryProcesses(long totalMemory)
         {
-            var highMemoryProcesses = new List<ProcessInfo>();
+            var highMemoryProcesses = new List<RamProcessInfo>();
 
             try
             {
@@ -233,7 +233,7 @@ namespace HardwareDiagnostics.Core.Utils
                         // 只关注占用超过 5% 内存的进程
                         if (memoryUsagePercent >= 5)
                         {
-                            highMemoryProcesses.Add(new ProcessInfo
+                            highMemoryProcesses.Add(new RamProcessInfo
                             {
                                 ProcessId = process.Id,
                                 ProcessName = process.ProcessName,
@@ -307,7 +307,9 @@ namespace HardwareDiagnostics.Core.Utils
         }
     }
 
-    public class ProcessInfo
+
+
+    internal class RamProcessInfo
     {
         public int ProcessId { get; set; }
         public string ProcessName { get; set; } = "";

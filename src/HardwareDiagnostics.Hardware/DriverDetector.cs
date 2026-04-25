@@ -243,6 +243,96 @@ namespace HardwareDiagnostics.Hardware
             }
         }
 
+        /// <summary>
+        /// 卸载驱动程序（使用 DriverDetectionResult）
+        /// </summary>
+        public DriverUninstallResult UninstallDriver(DriverDetectionResult driver)
+        {
+            var result = new DriverUninstallResult();
+
+            try
+            {
+                // 检查是否为系统关键驱动
+                if (IsCriticalDriver(driver))
+                {
+                    result.Success = false;
+                    result.ErrorMessage = "无法卸载系统关键驱动（如显卡、网卡、芯片组等），请在设备管理器中手动操作。";
+                    return result;
+                }
+
+                // 使用 pnputil 卸载驱动
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "pnputil.exe",
+                    Arguments = $"/remove-device \"{driver.DeviceId}\"",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    Verb = "runas"
+                };
+
+                using var process = Process.Start(psi);
+                if (process == null)
+                {
+                    result.Success = false;
+                    result.ErrorMessage = "无法启动卸载进程";
+                    return result;
+                }
+
+                string output = process.StandardOutput.ReadToEnd();
+                string error = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+
+                if (process.ExitCode == 0)
+                {
+                    result.Success = true;
+                    Logger.Info($"Driver uninstalled successfully: {driver.DeviceName}");
+                }
+                else
+                {
+                    result.Success = false;
+                    result.ErrorMessage = $"卸载失败: {error}";
+                    Logger.Warning($"Failed to uninstall driver: {error}");
+                }
+            }
+            catch (Exception ex)
+            {
+                result.Success = false;
+                result.ErrorMessage = $"卸载过程中发生错误: {ex.Message}";
+                Logger.Error("Error uninstalling driver", ex);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// 检查是否为系统关键驱动
+        /// </summary>
+        private bool IsCriticalDriver(DriverDetectionResult driver)
+        {
+            // 关键设备类别
+            var criticalClasses = new[] { "Display", "System", "Processor", "HDC", "SCSIAdapter" };
+            
+            // 检查设备类别
+            if (criticalClasses.Contains(driver.DeviceClass, StringComparer.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            // 检查设备名称中的关键词
+            var criticalKeywords = new[] { "显卡", "graphics", "chipset", "芯片组", "处理器", "processor" };
+            foreach (var keyword in criticalKeywords)
+            {
+                if (driver.DeviceName.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public string GetComputerModel()
         {
             try
@@ -531,6 +621,12 @@ namespace HardwareDiagnostics.Hardware
     {
         public bool Success { get; set; }
         public string Output { get; set; } = "";
+        public string ErrorMessage { get; set; } = "";
+    }
+
+    public class DriverUninstallResult
+    {
+        public bool Success { get; set; }
         public string ErrorMessage { get; set; } = "";
     }
 }

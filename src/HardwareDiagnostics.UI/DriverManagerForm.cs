@@ -19,6 +19,7 @@ namespace HardwareDiagnostics.UI
         private Button _scanButton;
         private Button _downloadButton;
         private Button _installButton;
+        private Button _uninstallButton;
         private Label _statusLabel;
         private List<DriverDetectionResult> _currentDrivers = new();
 
@@ -108,8 +109,21 @@ namespace HardwareDiagnostics.UI
             };
             _installButton.Click += async (s, e) => await InstallDriverAsync();
 
-            buttonPanel.Controls.AddRange(new Control[] { _scanButton, btnScanMissing, btnScanOutdated, _downloadButton, _installButton });
+            var btnUninstall = new Button
+            {
+                Text = "⚠️ 卸载驱动",
+                Width = 120,
+                Height = 30,
+                BackColor = Color.LightCoral,
+                Enabled = false
+            };
+            btnUninstall.Click += async (s, e) => await UninstallDriverAsync();
+
+            buttonPanel.Controls.AddRange(new Control[] { _scanButton, btnScanMissing, btnScanOutdated, _downloadButton, _installButton, btnUninstall });
             layout.Controls.Add(buttonPanel, 0, 1);
+
+            // 保存卸载按钮引用
+            _uninstallButton = btnUninstall;
 
             // 驱动列表
             _driverListView = new ListView
@@ -283,12 +297,17 @@ namespace HardwareDiagnostics.UI
                     ShowDriverDetails(driver);
                     _downloadButton.Enabled = driver.Status != DriverStatus.Normal && driver.DownloadSource != null;
                     _installButton.Enabled = driver.Status == DriverStatus.Missing || driver.Status == DriverStatus.Corrupted;
+                    // 只有已安装且非关键驱动才能卸载
+                    _uninstallButton.Enabled = driver.Status == DriverStatus.Normal || 
+                                               driver.Status == DriverStatus.Outdated ||
+                                               driver.Status == DriverStatus.Error;
                 }
             }
             else
             {
                 _downloadButton.Enabled = false;
                 _installButton.Enabled = false;
+                _uninstallButton.Enabled = false;
             }
         }
 
@@ -393,6 +412,106 @@ namespace HardwareDiagnostics.UI
                 }
 
                 _installButton.Enabled = true;
+                _statusLabel.Text = "就绪";
+            }
+        }
+
+        private async Task UninstallDriverAsync()
+        {
+            if (_driverListView.SelectedItems.Count == 0) return;
+
+            var driver = _driverListView.SelectedItems[0].Tag as DriverDetectionResult;
+            if (driver == null) return;
+
+            // 免责声明
+            var disclaimer = @"⚠️ 重要免责声明 ⚠️
+
+您即将卸载以下驱动程序：
+
+设备名称：{0}
+设备类型：{1}
+制造商：{2}
+
+警告：
+1. 卸载驱动可能导致设备无法正常工作
+2. 系统关键驱动（如显卡、网卡、芯片组）卸载后可能导致系统不稳定
+3. 卸载后可能需要重启计算机
+4. 建议在卸载前创建系统还原点
+
+不管出现任何问题，本软件以及团队概不负责！
+
+您确定要继续卸载吗？";
+
+            var message = string.Format(disclaimer, driver.DeviceName, driver.DeviceClass, driver.Manufacturer);
+            
+            var result = MessageBox.Show(
+                message,
+                "⚠️ 驱动卸载确认 - 免责声明",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2);
+
+            if (result != DialogResult.Yes)
+            {
+                return;
+            }
+
+            // 二次确认
+            var confirmResult = MessageBox.Show(
+                "这是最后一次确认！\n\n" +
+                "卸载驱动后设备可能立即失效！\n" +
+                "您真的确定要卸载吗？",
+                "最终确认",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Exclamation,
+                MessageBoxDefaultButton.Button2);
+
+            if (confirmResult != DialogResult.Yes)
+            {
+                return;
+            }
+
+            _uninstallButton.Enabled = false;
+            _statusLabel.Text = "正在卸载驱动...";
+
+            try
+            {
+                var uninstallResult = await Task.Run(() => _driverDetector.UninstallDriver(driver));
+
+                if (uninstallResult.Success)
+                {
+                    MessageBox.Show(
+                        "驱动卸载成功！\n\n" +
+                        "建议立即重启计算机以确保更改生效。",
+                        "卸载成功",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                    
+                    // 重新扫描
+                    await ScanAllDriversAsync();
+                }
+                else
+                {
+                    MessageBox.Show(
+                        $"驱动卸载失败：\n{uninstallResult.ErrorMessage}\n\n" +
+                        "请尝试手动在设备管理器中卸载。",
+                        "卸载失败",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"卸载过程中发生错误：\n{ex.Message}\n\n" +
+                    "请尝试手动在设备管理器中卸载。",
+                    "错误",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+            finally
+            {
+                _uninstallButton.Enabled = true;
                 _statusLabel.Text = "就绪";
             }
         }

@@ -11,6 +11,9 @@
     <AssemblyCompany>furry 皓予</AssemblyCompany>
     <AssemblyProduct>硬件检测与系统维护工具</AssemblyProduct>
     <AssemblyCopyright>Copyright © 2026 furry 皓予</AssemblyCopyright>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\HardwareDiagnostics.Core\HardwareDiagnostics.Core.csproj" />
