@@ -131,6 +131,21 @@ namespace HardwareDiagnostics.Core.Utils
             _maxThreads = Math.Max(1, Math.Min(256, threads));
         }
 
+        /// <summary>
+        /// 设置自定义工具路径
+        /// </summary>
+        public void SetCustomToolPath(string path)
+        {
+            if (File.Exists(path))
+            {
+                CustomToolPath = path;
+            }
+            else
+            {
+                throw new FileNotFoundException("指定的下载工具不存在", path);
+            }
+        }
+
         public string? CustomToolPath { get; private set; }
 
         /// <summary>

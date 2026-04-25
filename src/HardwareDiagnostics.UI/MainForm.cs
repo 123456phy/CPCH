@@ -631,13 +631,15 @@ namespace HardwareDiagnostics.UI
             var layout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                RowCount = 4,
-                ColumnCount = 3
+                RowCount = 5,
+                ColumnCount = 3,
+                Padding = new Padding(5)
             };
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 25));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 25));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 25));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 25));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 34));
@@ -647,7 +649,7 @@ namespace HardwareDiagnostics.UI
             {
                 Text = "打开设备管理器",
                 Dock = DockStyle.Fill,
-                Font = new Font("Microsoft YaHei", 11F)
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold)
             };
             btnDeviceManager.Click += (s, e) => _driverManager.OpenDeviceManager();
             layout.Controls.Add(btnDeviceManager, 0, 0);
@@ -657,7 +659,7 @@ namespace HardwareDiagnostics.UI
             {
                 Text = "设备健康检测",
                 Dock = DockStyle.Fill,
-                Font = new Font("Microsoft YaHei", 11F),
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold),
                 BackColor = Color.LightBlue
             };
             btnDeviceHealth.Click += (s, e) =>
@@ -672,7 +674,7 @@ namespace HardwareDiagnostics.UI
             {
                 Text = "硬件测试中心",
                 Dock = DockStyle.Fill,
-                Font = new Font("Microsoft YaHei", 11F),
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold),
                 BackColor = Color.LightGreen
             };
             btnHardwareTest.Click += (s, e) =>
@@ -687,7 +689,7 @@ namespace HardwareDiagnostics.UI
             {
                 Text = "驱动管理器",
                 Dock = DockStyle.Fill,
-                Font = new Font("Microsoft YaHei", 11F),
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold),
                 BackColor = Color.LightYellow
             };
             btnDriverManager.Click += (s, e) =>
@@ -702,7 +704,7 @@ namespace HardwareDiagnostics.UI
             {
                 Text = "DISM快捷命令",
                 Dock = DockStyle.Fill,
-                Font = new Font("Microsoft YaHei", 11F),
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold),
                 BackColor = Color.LightCyan
             };
             btnDismCommands.Click += (s, e) =>
@@ -717,7 +719,7 @@ namespace HardwareDiagnostics.UI
             {
                 Text = "系统信息",
                 Dock = DockStyle.Fill,
-                Font = new Font("Microsoft YaHei", 11F)
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold)
             };
             btnSystemInfo.Click += (s, e) => ShowSystemInfo();
             layout.Controls.Add(btnSystemInfo, 2, 1);
@@ -727,7 +729,7 @@ namespace HardwareDiagnostics.UI
             {
                 Text = "事件查看器",
                 Dock = DockStyle.Fill,
-                Font = new Font("Microsoft YaHei", 11F)
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold)
             };
             btnEventViewer.Click += (s, e) => OpenEventViewer();
             layout.Controls.Add(btnEventViewer, 0, 2);
@@ -737,7 +739,7 @@ namespace HardwareDiagnostics.UI
             {
                 Text = "系统配置",
                 Dock = DockStyle.Fill,
-                Font = new Font("Microsoft YaHei", 11F)
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold)
             };
             btnMsConfig.Click += (s, e) => OpenMsConfig();
             layout.Controls.Add(btnMsConfig, 1, 2);
@@ -747,7 +749,7 @@ namespace HardwareDiagnostics.UI
             {
                 Text = "管理员终端 💻",
                 Dock = DockStyle.Fill,
-                Font = new Font("Microsoft YaHei", 11F),
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold),
                 BackColor = Color.LightGray
             };
             btnTerminal.Click += async (s, e) => { await LaunchAdminTerminal(); };
@@ -758,7 +760,7 @@ namespace HardwareDiagnostics.UI
             {
                 Text = "安全中心 🔒",
                 Dock = DockStyle.Fill,
-                Font = new Font("Microsoft YaHei", 11F),
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold),
                 BackColor = Color.LightPink
             };
             btnSecurity.Click += (s, e) =>
@@ -773,7 +775,7 @@ namespace HardwareDiagnostics.UI
             {
                 Text = "下载管理器 📥",
                 Dock = DockStyle.Fill,
-                Font = new Font("Microsoft YaHei", 11F),
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold),
                 BackColor = Color.LightGreen
             };
             btnDownloadManager.Click += (s, e) =>
@@ -788,7 +790,7 @@ namespace HardwareDiagnostics.UI
             {
                 Text = "RAM 清理 🧹",
                 Dock = DockStyle.Fill,
-                Font = new Font("Microsoft YaHei", 11F),
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold),
                 BackColor = Color.LightYellow
             };
             btnRamCleaner.Click += (s, e) =>
@@ -803,7 +805,7 @@ namespace HardwareDiagnostics.UI
             {
                 Text = "DISM 教程 📖",
                 Dock = DockStyle.Fill,
-                Font = new Font("Microsoft YaHei", 11F),
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold),
                 BackColor = Color.LightBlue
             };
             btnDismTutorial.Click += (s, e) => ShowDismTutorial();
@@ -814,7 +816,7 @@ namespace HardwareDiagnostics.UI
             {
                 Text = "垃圾清理 🗑️",
                 Dock = DockStyle.Fill,
-                Font = new Font("Microsoft YaHei", 11F),
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold),
                 BackColor = Color.LightCyan
             };
             btnSystemCleaner.Click += (s, e) =>

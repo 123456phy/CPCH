@@ -19,6 +19,8 @@ namespace HardwareDiagnostics.UI
         private TextBox _outputPathTextBox;
         private NumericUpDown _threadCountNumeric;
         private ComboBox _toolComboBox;
+        private TextBox _customToolPathTextBox;
+        private Button _btnBrowseCustomTool;
         private Button _btnStartDownload;
         private Button _btnCancelDownload;
         private Button _btnBrowse;
@@ -38,20 +40,21 @@ namespace HardwareDiagnostics.UI
         private void InitializeComponent()
         {
             this.Text = "下载管理器";
-            this.Size = new Size(900, 650);
+            this.Size = new Size(1100, 800);
             this.StartPosition = FormStartPosition.CenterParent;
+            this.Font = new Font("Microsoft YaHei", 11F);
 
             var mainLayout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
                 RowCount = 4,
-                Padding = new Padding(10)
+                Padding = new Padding(15)
             };
-            mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 150));
-            mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
+            mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 220));
+            mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 60));
             mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
+            mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
 
             // 设置面板
             var settingsPanel = CreateSettingsPanel();
@@ -77,28 +80,52 @@ namespace HardwareDiagnostics.UI
             var panel = new Panel
             {
                 Dock = DockStyle.Fill,
-                BorderStyle = BorderStyle.FixedSingle
+                BorderStyle = BorderStyle.FixedSingle,
+                Padding = new Padding(10)
             };
 
             var layout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                ColumnCount = 2,
-                RowCount = 4
+                ColumnCount = 3,
+                RowCount = 5
             };
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
 
             // URL
-            layout.Controls.Add(new Label { Text = "下载 URL:", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight }, 0, 0);
-            _urlTextBox = new TextBox { Dock = DockStyle.Fill };
+            layout.Controls.Add(new Label { 
+                Text = "下载 URL:", 
+                Dock = DockStyle.Fill, 
+                TextAlign = ContentAlignment.MiddleRight,
+                Font = new Font("Microsoft YaHei", 11F, FontStyle.Bold)
+            }, 0, 0);
+            _urlTextBox = new TextBox { 
+                Dock = DockStyle.Fill,
+                Font = new Font("Microsoft YaHei", 11F)
+            };
             layout.Controls.Add(_urlTextBox, 1, 0);
+            layout.SetColumnSpan(_urlTextBox, 2);
 
             // 保存路径
-            layout.Controls.Add(new Label { Text = "保存路径:", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight }, 0, 1);
-            var pathPanel = new FlowLayoutPanel { Dock = DockStyle.Fill };
-            _outputPathTextBox = new TextBox { Width = 400 };
-            _btnBrowse = new Button { Text = "浏览...", Width = 60 };
+            layout.Controls.Add(new Label { 
+                Text = "保存路径:", 
+                Dock = DockStyle.Fill, 
+                TextAlign = ContentAlignment.MiddleRight,
+                Font = new Font("Microsoft YaHei", 11F, FontStyle.Bold)
+            }, 0, 1);
+            _outputPathTextBox = new TextBox { 
+                Dock = DockStyle.Fill,
+                Font = new Font("Microsoft YaHei", 11F)
+            };
+            layout.Controls.Add(_outputPathTextBox, 1, 1);
+            _btnBrowse = new Button { 
+                Text = "浏览...", 
+                Width = 130,
+                Height = 35,
+                Font = new Font("Microsoft YaHei", 10F)
+            };
             _btnBrowse.Click += (s, e) =>
             {
                 using var dialog = new SaveFileDialog();
@@ -107,28 +134,108 @@ namespace HardwareDiagnostics.UI
                     _outputPathTextBox.Text = dialog.FileName;
                 }
             };
-            pathPanel.Controls.Add(_outputPathTextBox);
-            pathPanel.Controls.Add(_btnBrowse);
-            layout.Controls.Add(pathPanel, 1, 1);
+            layout.Controls.Add(_btnBrowse, 2, 1);
 
             // 下载工具
-            layout.Controls.Add(new Label { Text = "下载工具:", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight }, 0, 2);
-            _toolComboBox = new ComboBox { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList };
+            layout.Controls.Add(new Label { 
+                Text = "下载工具:", 
+                Dock = DockStyle.Fill, 
+                TextAlign = ContentAlignment.MiddleRight,
+                Font = new Font("Microsoft YaHei", 11F, FontStyle.Bold)
+            }, 0, 2);
+            _toolComboBox = new ComboBox { 
+                Dock = DockStyle.Fill, 
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Microsoft YaHei", 11F),
+                Height = 30
+            };
+            _toolComboBox.SelectedIndexChanged += (s, e) => UpdateCustomToolVisibility();
             layout.Controls.Add(_toolComboBox, 1, 2);
+            layout.SetColumnSpan(_toolComboBox, 2);
+
+            // 自定义工具路径
+            layout.Controls.Add(new Label { 
+                Text = "自定义工具:", 
+                Dock = DockStyle.Fill, 
+                TextAlign = ContentAlignment.MiddleRight,
+                Font = new Font("Microsoft YaHei", 11F, FontStyle.Bold),
+                Name = "lblCustomTool"
+            }, 0, 3);
+            _customToolPathTextBox = new TextBox { 
+                Dock = DockStyle.Fill,
+                Font = new Font("Microsoft YaHei", 11F),
+                Name = "txtCustomTool"
+            };
+            layout.Controls.Add(_customToolPathTextBox, 1, 3);
+            _btnBrowseCustomTool = new Button { 
+                Text = "选择工具...", 
+                Width = 130,
+                Height = 35,
+                Font = new Font("Microsoft YaHei", 10F),
+                Name = "btnBrowseCustomTool"
+            };
+            _btnBrowseCustomTool.Click += (s, e) =>
+            {
+                using var dialog = new OpenFileDialog
+                {
+                    Filter = "可执行文件|*.exe|所有文件|*.*",
+                    Title = "选择下载工具"
+                };
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    _customToolPathTextBox.Text = dialog.FileName;
+                }
+            };
+            layout.Controls.Add(_btnBrowseCustomTool, 2, 3);
 
             // 线程数
-            layout.Controls.Add(new Label { Text = "并发线程:", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight }, 0, 3);
+            layout.Controls.Add(new Label { 
+                Text = "并发线程:", 
+                Dock = DockStyle.Fill, 
+                TextAlign = ContentAlignment.MiddleRight,
+                Font = new Font("Microsoft YaHei", 11F, FontStyle.Bold)
+            }, 0, 4);
+            var threadPanel = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight };
             _threadCountNumeric = new NumericUpDown
             {
                 Minimum = 1,
                 Maximum = 256,
                 Value = 8,
-                Width = 100
+                Width = 120,
+                Height = 35,
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold),
+                TextAlign = HorizontalAlignment.Center
             };
-            layout.Controls.Add(_threadCountNumeric, 1, 3);
+            var threadHint = new Label
+            {
+                Text = " (建议: 小文件 16-32线程, 大文件 4-8线程)",
+                AutoSize = true,
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            threadPanel.Controls.Add(_threadCountNumeric);
+            threadPanel.Controls.Add(threadHint);
+            layout.Controls.Add(threadPanel, 1, 4);
+            layout.SetColumnSpan(threadPanel, 2);
 
             panel.Controls.Add(layout);
             return panel;
+        }
+
+        private void UpdateCustomToolVisibility()
+        {
+            bool isCustom = _toolComboBox.SelectedItem?.ToString() == "自定义工具";
+            _customToolPathTextBox.Visible = isCustom;
+            _btnBrowseCustomTool.Visible = isCustom;
+            
+            // 更新标签可见性
+            foreach (Control ctrl in _customToolPathTextBox.Parent.Controls)
+            {
+                if (ctrl is Label lbl && lbl.Name == "lblCustomTool")
+                {
+                    lbl.Visible = isCustom;
+                }
+            }
         }
 
         private Panel CreateButtonPanel()
@@ -136,39 +243,57 @@ namespace HardwareDiagnostics.UI
             var panel = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                FlowDirection = FlowDirection.LeftToRight
+                FlowDirection = FlowDirection.LeftToRight,
+                Padding = new Padding(5)
             };
 
             _btnStartDownload = new Button
             {
                 Text = "开始下载",
-                Width = 100,
-                Height = 35,
-                BackColor = Color.LightGreen
+                Width = 140,
+                Height = 45,
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold),
+                BackColor = Color.LightGreen,
+                Margin = new Padding(5)
             };
             _btnStartDownload.Click += async (s, e) => await StartDownloadAsync();
 
             _btnCancelDownload = new Button
             {
                 Text = "取消下载",
-                Width = 100,
-                Height = 35,
+                Width = 140,
+                Height = 45,
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold),
                 BackColor = Color.LightCoral,
-                Enabled = false
+                Enabled = false,
+                Margin = new Padding(5)
             };
             _btnCancelDownload.Click += (s, e) => CancelDownload();
 
             var btnDetectTools = new Button
             {
                 Text = "检测下载工具",
-                Width = 120,
-                Height = 35
+                Width = 160,
+                Height = 45,
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold),
+                Margin = new Padding(5)
             };
             btnDetectTools.Click += (s, e) => DetectDownloadTools();
+
+            var btnClear = new Button
+            {
+                Text = "清空列表",
+                Width = 140,
+                Height = 45,
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold),
+                Margin = new Padding(5)
+            };
+            btnClear.Click += (s, e) => _downloadListView.Items.Clear();
 
             panel.Controls.Add(_btnStartDownload);
             panel.Controls.Add(_btnCancelDownload);
             panel.Controls.Add(btnDetectTools);
+            panel.Controls.Add(btnClear);
 
             return panel;
         }
@@ -180,13 +305,14 @@ namespace HardwareDiagnostics.UI
                 Dock = DockStyle.Fill,
                 View = View.Details,
                 FullRowSelect = true,
-                GridLines = true
+                GridLines = true,
+                Font = new Font("Microsoft YaHei", 10F)
             };
-            listView.Columns.Add("文件名", 200);
-            listView.Columns.Add("URL", 300);
-            listView.Columns.Add("进度", 100);
-            listView.Columns.Add("大小", 80);
-            listView.Columns.Add("状态", 150);
+            listView.Columns.Add("文件名", 250);
+            listView.Columns.Add("URL", 350);
+            listView.Columns.Add("进度", 120);
+            listView.Columns.Add("大小", 100);
+            listView.Columns.Add("状态", 200);
 
             return listView;
         }
@@ -204,7 +330,8 @@ namespace HardwareDiagnostics.UI
             {
                 Text = "就绪",
                 Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleLeft
+                TextAlign = ContentAlignment.MiddleLeft,
+                Font = new Font("Microsoft YaHei", 11F)
             };
             panel.Controls.Add(_statusLabel, 0, 0);
 
@@ -212,7 +339,8 @@ namespace HardwareDiagnostics.UI
             {
                 Dock = DockStyle.Fill,
                 Minimum = 0,
-                Maximum = 100
+                Maximum = 100,
+                Height = 30
             };
             panel.Controls.Add(_progressBar, 1, 0);
 
@@ -227,6 +355,9 @@ namespace HardwareDiagnostics.UI
             _toolComboBox.Items.Add("aria2");
             _toolComboBox.Items.Add("自定义工具");
             _toolComboBox.SelectedIndex = 0;
+
+            // 初始隐藏自定义工具路径
+            UpdateCustomToolVisibility();
 
             DetectDownloadTools();
         }
@@ -262,8 +393,7 @@ namespace HardwareDiagnostics.UI
         {
             var detection = DownloadManager.DetectAvailableTools();
             
-            var items = _toolComboBox.Items.Cast<string>().ToList();
-            items.Clear();
+            var items = new List<string>();
 
             items.Add("内置下载器 (.NET)");
             if (detection.CurlAvailable) items.Add("curl ✓");
@@ -277,11 +407,16 @@ namespace HardwareDiagnostics.UI
             
             items.Add("自定义工具");
 
+            int selectedIndex = _toolComboBox.SelectedIndex;
             _toolComboBox.Items.Clear();
             _toolComboBox.Items.AddRange(items.ToArray());
-            _toolComboBox.SelectedIndex = 0;
+            
+            if (selectedIndex >= 0 && selectedIndex < _toolComboBox.Items.Count)
+                _toolComboBox.SelectedIndex = selectedIndex;
+            else
+                _toolComboBox.SelectedIndex = 0;
 
-            _statusLabel.Text = $"检测完成 - curl: {(detection.CurlAvailable ? "可用" : "不可用")}, wget: {(detection.WgetAvailable ? "可用" : "不可用")}";
+            _statusLabel.Text = $"检测完成 - curl: {(detection.CurlAvailable ? "可用" : "不可用")}, wget: {(detection.WgetAvailable ? "可用" : "不可用")}, aria2: {(detection.Aria2Available ? "可用" : "不可用")}";
         }
 
         private async Task StartDownloadAsync()
@@ -292,16 +427,32 @@ namespace HardwareDiagnostics.UI
                 return;
             }
 
+            // 检查自定义工具路径
+            if (_toolComboBox.SelectedItem?.ToString() == "自定义工具")
+            {
+                if (string.IsNullOrEmpty(_customToolPathTextBox.Text))
+                {
+                    MessageBox.Show("请选择自定义下载工具路径", "错误", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                if (!File.Exists(_customToolPathTextBox.Text))
+                {
+                    MessageBox.Show("指定的自定义工具不存在", "错误", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+            }
+
             _btnStartDownload.Enabled = false;
             _btnCancelDownload.Enabled = true;
             _cancellationTokenSource = new CancellationTokenSource();
 
-            var selectedTool = _toolComboBox.SelectedIndex switch
+            var selectedToolText = _toolComboBox.SelectedItem?.ToString() ?? "";
+            var selectedTool = selectedToolText switch
             {
-                1 => DownloadTool.Curl,
-                2 => DownloadTool.Wget,
-                3 => DownloadTool.Aria2,
-                4 => DownloadTool.Custom,
+                var s when s.StartsWith("curl") => DownloadTool.Curl,
+                var s when s.StartsWith("wget") => DownloadTool.Wget,
+                var s when s.StartsWith("aria2") => DownloadTool.Aria2,
+                "自定义工具" => DownloadTool.Custom,
                 _ => DownloadTool.BuiltIn
             };
 
@@ -309,12 +460,20 @@ namespace HardwareDiagnostics.UI
             {
                 _downloadManager.SetDownloadTool(selectedTool);
                 _downloadManager.SetMaxThreads((int)_threadCountNumeric.Value);
+                
+                // 设置自定义工具路径
+                if (selectedTool == DownloadTool.Custom)
+                {
+                    _downloadManager.SetCustomToolPath(_customToolPathTextBox.Text);
+                }
 
+                _statusLabel.Text = "正在下载...";
+                
                 var result = await _downloadManager.DownloadAsync(_urlTextBox.Text, _outputPathTextBox.Text, _cancellationTokenSource.Token);
 
                 if (result.Success)
                 {
-                    MessageBox.Show($"下载完成！\n文件：{result.OutputPath}\n大小：{result.BytesDownloaded / 1024 / 1024} MB", "成功", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show($"下载完成！\n文件：{result.OutputPath}\n大小：{result.BytesDownloaded / 1024.0 / 1024.0:F2} MB", "成功", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 else
                 {
@@ -340,7 +499,7 @@ namespace HardwareDiagnostics.UI
 
         private void UpdateProgress(int percentage)
         {
-            _progressBar.Value = percentage;
+            _progressBar.Value = Math.Min(percentage, 100);
             _statusLabel.Text = $"下载进度：{percentage}%";
         }
 
