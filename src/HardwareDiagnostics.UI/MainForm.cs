@@ -1213,27 +1213,7 @@ namespace HardwareDiagnostics.UI
 
         private void ShowDismTutorial()
         {
-            var fullTutorial = DismTutorialV3.GetFullTutorial();
-
-            var form = new Form
-            {
-                Text = "DISM 终极教程 V3 - 基于微软官方文档",
-                Size = new Size(1100, 800),
-                StartPosition = FormStartPosition.CenterParent
-            };
-
-            var textBox = new TextBox
-            {
-                Text = fullTutorial,
-                Dock = DockStyle.Fill,
-                Multiline = true,
-                ReadOnly = true,
-                ScrollBars = ScrollBars.Both,
-                Font = new Font("Consolas", 10F),
-                BackColor = Color.White
-            };
-
-            form.Controls.Add(textBox);
+            var form = new DismTutorialForm();
             form.ShowDialog(this);
         }
 
