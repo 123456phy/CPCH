@@ -1213,116 +1213,27 @@ namespace HardwareDiagnostics.UI
 
         private void ShowDismTutorial()
         {
-            var tutorial = DismTutorialV2.GetIntroduction();
-            var tutorialItems = DismTutorialV2.GetTutorials();
-            var scenarios = DismTutorialV2.GetCommonScenarios();
-            var quickRef = DismTutorialV2.GetQuickReference();
+            var fullTutorial = DismTutorialV3.GetFullTutorial();
 
             var form = new Form
             {
-                Text = "DISM 新手教程 V2 - 更人性化的系统修复指南",
-                Size = new Size(1000, 750),
+                Text = "DISM 终极教程 V3 - 基于微软官方文档",
+                Size = new Size(1100, 800),
                 StartPosition = FormStartPosition.CenterParent
             };
 
-            var tabControl = new TabControl { Dock = DockStyle.Fill };
-
-            // 简介标签页
-            var introTab = new TabPage("📖 简介");
-            var introTextBox = new TextBox
+            var textBox = new TextBox
             {
-                Text = tutorial,
+                Text = fullTutorial,
                 Dock = DockStyle.Fill,
                 Multiline = true,
                 ReadOnly = true,
-                ScrollBars = ScrollBars.Vertical,
-                Font = new Font("Microsoft YaHei", 10F)
-            };
-            introTab.Controls.Add(introTextBox);
-            tabControl.TabPages.Add(introTab);
-
-            // 命令列表标签页
-            var commandsTab = new TabPage("🔧 命令详解");
-            var commandListView = new ListView
-            {
-                Dock = DockStyle.Fill,
-                View = View.Details,
-                FullRowSelect = true,
-                GridLines = true
-            };
-            commandListView.Columns.Add("分类", 150);
-            commandListView.Columns.Add("功能", 250);
-            commandListView.Columns.Add("命令", 350);
-            commandListView.Columns.Add("耗时", 100);
-
-            foreach (var item in tutorialItems)
-            {
-                var listViewItem = new ListViewItem(item.Category);
-                listViewItem.SubItems.Add(item.Title);
-                listViewItem.SubItems.Add(item.Command);
-                listViewItem.SubItems.Add(item.Duration);
-                listViewItem.Tag = item;
-                commandListView.Items.Add(listViewItem);
-            }
-
-            commandListView.SelectedIndexChanged += (s, e) =>
-            {
-                if (commandListView.SelectedItems.Count > 0)
-                {
-                    var selectedItem = commandListView.SelectedItems[0];
-                    if (selectedItem.Tag is DismTutorialItemV2 tutorialItem)
-                    {
-                        var details = new StringBuilder();
-                        details.AppendLine($"📝 {tutorialItem.Title}");
-                        details.AppendLine();
-                        details.AppendLine($"📋 说明：{tutorialItem.Description}");
-                        details.AppendLine();
-                        details.AppendLine($"🤔 什么时候用：");
-                        details.AppendLine(tutorialItem.WhenToUse);
-                        details.AppendLine();
-                        details.AppendLine($"⏱️ 执行时间：{tutorialItem.Duration}");
-                        details.AppendLine($"⚠️ 风险等级：{tutorialItem.RiskLevel}");
-                        details.AppendLine();
-                        details.AppendLine($"💡 使用建议：");
-                        details.AppendLine(tutorialItem.TroubleshootingTips);
-
-                        MessageBox.Show(details.ToString(), "详细说明", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    }
-                }
+                ScrollBars = ScrollBars.Both,
+                Font = new Font("Consolas", 10F),
+                BackColor = Color.White
             };
 
-            commandsTab.Controls.Add(commandListView);
-            tabControl.TabPages.Add(commandsTab);
-
-            // 疑难杂症标签页
-            var scenariosTab = new TabPage("🚑 疑难杂症");
-            var scenariosTextBox = new TextBox
-            {
-                Text = scenarios,
-                Dock = DockStyle.Fill,
-                Multiline = true,
-                ReadOnly = true,
-                ScrollBars = ScrollBars.Vertical,
-                Font = new Font("Microsoft YaHei", 10F)
-            };
-            scenariosTab.Controls.Add(scenariosTextBox);
-            tabControl.TabPages.Add(scenariosTab);
-
-            // 快速参考标签页
-            var quickRefTab = new TabPage("📋 快速参考");
-            var quickRefTextBox = new TextBox
-            {
-                Text = quickRef,
-                Dock = DockStyle.Fill,
-                Multiline = true,
-                ReadOnly = true,
-                ScrollBars = ScrollBars.Vertical,
-                Font = new Font("Consolas", 10F)
-            };
-            quickRefTab.Controls.Add(quickRefTextBox);
-            tabControl.TabPages.Add(quickRefTab);
-
-            form.Controls.Add(tabControl);
+            form.Controls.Add(textBox);
             form.ShowDialog(this);
         }
 
