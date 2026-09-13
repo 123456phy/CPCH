@@ -8,9 +8,10 @@ namespace HardwareDiagnostics.Core.Utils
 {
     public static class MemoryOptimizer
     {
-        private const long MaxMemoryBytes = 300 * 1024 * 1024; // 300MB
+        private const long MaxMemoryBytes = 150 * 1024 * 1024; // 150MB：自己先瘦身
         private static Timer? _memoryCheckTimer;
         private static readonly object _lock = new();
+        private static int _checkRunning; // 防重入：Timer 回调串行化
 
         [DllImport("kernel32.dll")]
         private static extern bool SetProcessWorkingSetSize(IntPtr proc, int min, int max);
@@ -37,10 +38,11 @@ namespace HardwareDiagnostics.Core.Utils
 
         private static void CheckMemory(object? state)
         {
+            // 防重入：上一次还没跑完就跳过本次，避免 Timer 堆积
+            if (Interlocked.Exchange(ref _checkRunning, 1) == 1) return;
             try
             {
-                var proc = Process.GetCurrentProcess();
-                long memoryBytes = proc.WorkingSet64;
+                long memoryBytes = GetCurrentMemoryUsage();
 
                 if (memoryBytes > MaxMemoryBytes)
                 {
@@ -49,13 +51,14 @@ namespace HardwareDiagnostics.Core.Utils
                 }
             }
             catch { }
+            finally { Interlocked.Exchange(ref _checkRunning, 0); }
         }
 
         public static void ForceGarbageCollection()
         {
-            GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized, false);
-            GC.WaitForPendingFinalizers();
-            GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized, false);
+            // 单次 Gen2 Optimized 回收即可；双 Collect + WaitForPendingFinalizers
+            // 会阻塞 UI 线程数百毫秒，只在超限时做一次
+            GC.Collect(2, GCCollectionMode.Optimized, false, false);
         }
 
         public static void TrimWorkingSet()
@@ -70,7 +73,9 @@ namespace HardwareDiagnostics.Core.Utils
 
         public static long GetCurrentMemoryUsage()
         {
-            return Process.GetCurrentProcess().WorkingSet64;
+            // GC.GetTotalMemory 不创建 Process 句柄，开销远小于 GetCurrentProcess().WorkingSet64
+            try { return GC.GetTotalMemory(false); }
+            catch { return Process.GetCurrentProcess().WorkingSet64; }
         }
 
         public static string GetMemoryUsageText()

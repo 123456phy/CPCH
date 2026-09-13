@@ -14,8 +14,23 @@ namespace HardwareDiagnostics.Core.Utils
     {
         private Timer? _monitoringTimer;
         private bool _isMonitoring;
-        private readonly List<int> _whitelistedProcesses = new();
+        private int _checkRunning; // 防重入
+        private readonly HashSet<int> _whitelistedProcesses = new();
         private readonly object _lock = new();
+
+        // 系统关键进程：静态只读 HashSet，OrdinalIgnoreCase，避免每次 new 数组 + 线性扫描
+        private static readonly HashSet<string> CriticalProcesses = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "system", "smss", "csrss", "wininit", "services", "lsass",
+            "svchost", "explorer", "dwm", "winlogon", "runtimebroker",
+            "searchui", "ctfmon", "taskmgr", "resmon", "msmpeng", "nissrv"
+        };
+
+        // PerformanceCounter 复用单例：每次 new 会泄漏句柄且首次读数不准
+        private static readonly object _counterLock = new();
+        private static System.Diagnostics.PerformanceCounter? _availMBytesCounter;
+        private static long _cachedTotalPhysicalMemory;
+        private static DateTime _totalMemCachedAt = DateTime.MinValue;
 
         // 内存清理 API
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -28,11 +43,12 @@ namespace HardwareDiagnostics.Core.Utils
         public event EventHandler<HighMemoryProcessEventArgs>? HighMemoryProcessDetected;
 
         /// <summary>
-        /// 启动内存监控
+        /// 启动内存监控（默认 30 秒；高频轮询本身就是耗电耗 CPU 的元凶）。
         /// </summary>
-        public void StartMonitoring(int checkIntervalSeconds = 10)
+        public void StartMonitoring(int checkIntervalSeconds = 30)
         {
             if (_isMonitoring) return;
+            if (checkIntervalSeconds < 5) checkIntervalSeconds = 5; // 最小 5 秒，防手滑填 1 秒打爆 CPU
 
             _isMonitoring = true;
             _monitoringTimer = new Timer(CheckMemoryUsage, null, TimeSpan.Zero, TimeSpan.FromSeconds(checkIntervalSeconds));
@@ -90,9 +106,11 @@ namespace HardwareDiagnostics.Core.Utils
 
         private void CheckMemoryUsage(object? state)
         {
+            if (Interlocked.Exchange(ref _checkRunning, 1) == 1) return;
             try
             {
                 var totalPhysicalMemory = GetTotalPhysicalMemory();
+                if (totalPhysicalMemory <= 0) return;
                 var availableMemory = GetAvailablePhysicalMemory();
                 var memoryUsagePercent = ((totalPhysicalMemory - availableMemory) * 100) / totalPhysicalMemory;
 
@@ -145,6 +163,7 @@ namespace HardwareDiagnostics.Core.Utils
             {
                 Logger.Error("内存监控出错", ex);
             }
+            finally { Interlocked.Exchange(ref _checkRunning, 0); }
         }
 
         private bool IsUselessProcess(RamProcessInfo processInfo)
@@ -183,14 +202,7 @@ namespace HardwareDiagnostics.Core.Utils
 
         private bool IsSystemCriticalProcess(string processName)
         {
-            var criticalProcesses = new[]
-            {
-                "system", "smss", "csrss", "wininit", "services", "lsass",
-                "svchost", "explorer", "dwm", "winlogon", "runtimebroker",
-                "searchui", "ctfmon", "taskmgr", "resource monitor"
-            };
-
-            return criticalProcesses.Contains(processName.ToLower());
+            return !string.IsNullOrEmpty(processName) && CriticalProcesses.Contains(processName);
         }
 
         private void CleanProcessMemory(int processId)
@@ -256,21 +268,66 @@ namespace HardwareDiagnostics.Core.Utils
 
         private long GetTotalPhysicalMemory()
         {
+            // 总内存几乎不变，缓存 1 小时，避免每次 new PerformanceCounter
+            if (_cachedTotalPhysicalMemory > 0 && DateTime.UtcNow - _totalMemCachedAt < TimeSpan.FromHours(1))
+                return _cachedTotalPhysicalMemory;
             try
             {
-                return new System.Diagnostics.PerformanceCounter("Memory", "Total Visible Memory").RawValue * 1024 * 1024;
+                using var pc = new System.Diagnostics.PerformanceCounter("Memory", "Available MBytes");
+                // 用 WMI 一次性拿总量太重，这里用“可用+已用估算”兜底：
+                // 更轻量的做法是 P/Invoke GlobalMemoryStatusEx
+                var mem = GetMemoryStatusEx();
+                if (mem > 0)
+                {
+                    _cachedTotalPhysicalMemory = mem;
+                    _totalMemCachedAt = DateTime.UtcNow;
+                    return mem;
+                }
             }
-            catch
+            catch { }
+            return _cachedTotalPhysicalMemory > 0 ? _cachedTotalPhysicalMemory : 4L * 1024 * 1024 * 1024;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MEMORYSTATUSEX
+        {
+            public uint dwLength;
+            public uint dwMemoryLoad;
+            public ulong ullTotalPhys;
+            public ulong ullAvailPhys;
+            public ulong ullTotalPageFile;
+            public ulong ullAvailPageFile;
+            public ulong ullTotalVirtual;
+            public ulong ullAvailVirtual;
+            public ulong ullAvailExtendedVirtual;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
+
+        private static long GetMemoryStatusEx()
+        {
+            try
             {
-                return System.GC.GetTotalMemory(false) * 1024 * 1024;
+                var status = new MEMORYSTATUSEX { dwLength = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX)) };
+                if (GlobalMemoryStatusEx(ref status)) return (long)status.ullTotalPhys;
             }
+            catch { }
+            return 0;
         }
 
         private long GetAvailablePhysicalMemory()
         {
             try
             {
-                return new System.Diagnostics.PerformanceCounter("Memory", "Available MBytes").RawValue * 1024 * 1024;
+                // 复用单例 counter；首次 NextValue 不准，返回 0 由调用方跳过本轮
+                lock (_counterLock)
+                {
+                    _availMBytesCounter ??= new System.Diagnostics.PerformanceCounter("Memory", "Available MBytes");
+                    float mb = _availMBytesCounter.NextValue();
+                    if (mb <= 0) return 0;
+                    return (long)mb * 1024 * 1024;
+                }
             }
             catch
             {
@@ -279,19 +336,18 @@ namespace HardwareDiagnostics.Core.Utils
         }
 
         /// <summary>
-        /// 立即清理所有可清理的内存
+        /// 立即清理所有可清理的内存（温和版：只做 Gen2 Optimized + 自身工作集修剪，
+        /// 不再暴力 SetProcessWorkingSetSize(0,0)，后者会引发缺页抖动反而更卡）。
         /// </summary>
         public void CleanNow()
         {
             try
             {
                 // 强制垃圾回收
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                GC.Collect();
+                GC.Collect(2, GCCollectionMode.Optimized, false, false);
 
                 // 清理系统工作集
-                SetProcessWorkingSetSize(Process.GetCurrentProcess().Handle, IntPtr.Zero, IntPtr.Zero);
+                try { EmptyWorkingSet(Process.GetCurrentProcess().Handle); } catch { }
 
                 Logger.Info("立即内存清理完成");
             }
@@ -304,6 +360,11 @@ namespace HardwareDiagnostics.Core.Utils
         public void Dispose()
         {
             StopMonitoring();
+            lock (_counterLock)
+            {
+                try { _availMBytesCounter?.Dispose(); } catch { }
+                _availMBytesCounter = null;
+            }
         }
     }
 

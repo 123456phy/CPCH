@@ -52,6 +52,18 @@ namespace HardwareDiagnostics.Security
         private readonly Dictionary<string, ConnectionTracker> _connectionTrackers = new();
         private readonly SecurityLogger _securityLogger;
 
+        // 可靠性增强：信任白名单 + 告警节流 + 过期清理
+        private readonly HashSet<string> _trustedIPs = new(StringComparer.OrdinalIgnoreCase) { "127.0.0.1", "::1" };
+        private readonly Dictionary<string, DateTime> _lastAlertTimes = new();
+        private static readonly TimeSpan AlertThrottleInterval = TimeSpan.FromSeconds(60);
+        private const int MaxTrackers = 5000;
+        private static readonly TimeSpan TrackerStaleAfter = TimeSpan.FromMinutes(10);
+        private const int MaxStoredPackets = 500;
+        private long _droppedPacketCount;
+
+        /// <summary>因节流/白名单被抑制的告警数（可用于判断是否漏报）。</summary>
+        public long DroppedPacketCount => _droppedPacketCount;
+
         public event EventHandler<SuspiciousPacketEventArgs>? SuspiciousPacketDetected;
         public event EventHandler<AttackDetectedEventArgs>? AttackDetected;
 
@@ -102,16 +114,79 @@ namespace HardwareDiagnostics.Security
 
         public void StopMonitoring()
         {
+            Thread? threadToJoin = null;
             lock (_lock)
             {
                 if (!_isRunning) return;
 
                 _isRunning = false;
-                _rawSocket?.Close();
+                threadToJoin = _captureThread;
+                try { _rawSocket?.Close(); } catch { }
                 _rawSocket = null;
 
                 Logger.Info("Network firewall stopped");
-                _securityLogger.LogSecurityEvent(SecurityEventType.FirewallStopped, "网络防火墙已停止");
+                try { _securityLogger.LogSecurityEvent(SecurityEventType.FirewallStopped, "网络防火墙已停止"); } catch { }
+            }
+
+            // 在锁外等捕获线程退出，避免 Join 时持锁死锁
+            try { threadToJoin?.Join(TimeSpan.FromSeconds(2)); } catch { }
+        }
+
+        /// <summary>加入信任 IP（白名单），命中后跳过检测、不告警。</summary>
+        public void AddTrustedIP(string ip)
+        {
+            if (string.IsNullOrWhiteSpace(ip)) return;
+            lock (_trustedIPs) { _trustedIPs.Add(ip.Trim()); }
+        }
+
+        /// <summary>从白名单移除。</summary>
+        public void RemoveTrustedIP(string ip)
+        {
+            if (string.IsNullOrWhiteSpace(ip)) return;
+            lock (_trustedIPs) { _trustedIPs.Remove(ip.Trim()); }
+        }
+
+        public bool IsTrusted(string ip)
+        {
+            if (string.IsNullOrEmpty(ip)) return false;
+            lock (_trustedIPs) { return _trustedIPs.Contains(ip); }
+        }
+
+        /// <summary>同源同类型 60 秒内只报一次，防止告警轰炸。</summary>
+        private bool ShouldThrottle(string sourceIP, ThreatType type)
+        {
+            string key = sourceIP + "|" + type;
+            var now = DateTime.UtcNow;
+            lock (_lastAlertTimes)
+            {
+                if (_lastAlertTimes.TryGetValue(key, out var last) && now - last < AlertThrottleInterval)
+                    return true;
+                _lastAlertTimes[key] = now;
+                // 顺手清理过期节流键，防止字典无限增长
+                if (_lastAlertTimes.Count > 2000)
+                {
+                    var cutoff = now - AlertThrottleInterval;
+                    foreach (var k in _lastAlertTimes.Where(p => p.Value < cutoff).Select(p => p.Key).ToList())
+                        _lastAlertTimes.Remove(k);
+                }
+                return false;
+            }
+        }
+
+        /// <summary>清理 10 分钟无活动的 tracker，超 5000 个按最旧淘汰。</summary>
+        private void CleanupStaleTrackers()
+        {
+            lock (_connectionTrackers)
+            {
+                if (_connectionTrackers.Count == 0) return;
+                var cutoff = DateTime.Now - TrackerStaleAfter;
+                foreach (var k in _connectionTrackers.Where(p => p.Value.LastSeen < cutoff).Select(p => p.Key).ToList())
+                    _connectionTrackers.Remove(k);
+                while (_connectionTrackers.Count > MaxTrackers)
+                {
+                    var oldest = _connectionTrackers.OrderBy(p => p.Value.LastSeen).First().Key;
+                    _connectionTrackers.Remove(oldest);
+                }
             }
         }
 
@@ -157,6 +232,9 @@ namespace HardwareDiagnostics.Security
 
                 // 只处理TCP/UDP/ICMP
                 if (protocol != 6 && protocol != 17 && protocol != 1) return;
+
+                // 白名单直接放行，不做检测
+                if (IsTrusted(srcIP)) return;
 
                 var packet = new PacketInfo
                 {
@@ -258,6 +336,7 @@ namespace HardwareDiagnostics.Security
 
                     tracker.SynCount++;
                     tracker.LastSynTime = DateTime.Now;
+                    tracker.LastSeen = DateTime.Now;
 
                     // SYN Flood检测：大量SYN无ACK
                     if (tracker.SynCount > 100 && tracker.SynCount > tracker.AckCount * 3)
@@ -324,10 +403,13 @@ namespace HardwareDiagnostics.Security
 
         private SuspiciousPacket? DetectAttackSignature(PacketInfo packet, byte[] buffer, int ipHeaderLength, int totalLength)
         {
-            // 转换为字符串进行签名检测
+            // 转换为字符串进行签名检测（Latin1 避免二进制误解码，限 512 字节防大包拷贝）
             if (totalLength - ipHeaderLength < 10) return null;
 
-            string payload = Encoding.ASCII.GetString(buffer, ipHeaderLength, Math.Min(totalLength - ipHeaderLength, 100));
+            int payloadLen = Math.Min(totalLength - ipHeaderLength, 512);
+            string payload;
+            try { payload = Encoding.GetEncoding("iso-8859-1").GetString(buffer, ipHeaderLength, payloadLen); }
+            catch { return null; }
 
             // SQL注入检测
             string[] sqlSignatures = { "' OR '", "' AND '", "'; DROP", "UNION SELECT", "INSERT INTO", "DELETE FROM" };
@@ -412,32 +494,50 @@ namespace HardwareDiagnostics.Security
 
         private void HandleSuspiciousPacket(SuspiciousPacket packet)
         {
+            // 节流：同源同类型 60 秒只报一次
+            if (ShouldThrottle(packet.SourceIP, packet.ThreatType))
+            {
+                Interlocked.Increment(ref _droppedPacketCount);
+                return;
+            }
+
             lock (_suspiciousPackets)
             {
                 _suspiciousPackets.Add(packet);
 
-                // 只保留最近1000条
-                if (_suspiciousPackets.Count > 1000)
+                // 只保留最近500条
+                while (_suspiciousPackets.Count > MaxStoredPackets)
                 {
                     _suspiciousPackets.RemoveAt(0);
                 }
             }
 
-            // 记录安全日志
-            _securityLogger.LogSuspiciousPacket(packet);
+            // 记录安全日志（失败不影响捕获线程）
+            try { _securityLogger.LogSuspiciousPacket(packet); } catch (Exception ex) { Logger.Debug($"Log packet failed: {ex.Message}"); }
 
-            // 触发事件
-            SuspiciousPacketDetected?.Invoke(this, new SuspiciousPacketEventArgs { Packet = packet });
+            // 触发事件（订阅者异常不能拖垮捕获线程）
+            try { SuspiciousPacketDetected?.Invoke(this, new SuspiciousPacketEventArgs { Packet = packet }); }
+            catch (Exception ex) { Logger.Debug($"Packet event handler failed: {ex.Message}"); }
 
             // 如果是高危威胁，触发攻击检测事件
             if (packet.Severity == ThreatSeverity.Critical || packet.Severity == ThreatSeverity.High)
             {
-                AttackDetected?.Invoke(this, new AttackDetectedEventArgs
+                try
                 {
-                    AttackType = packet.ThreatType.ToString(),
-                    SourceIP = packet.SourceIP,
-                    Severity = packet.Severity
-                });
+                    AttackDetected?.Invoke(this, new AttackDetectedEventArgs
+                    {
+                        AttackType = packet.ThreatType.ToString(),
+                        SourceIP = packet.SourceIP,
+                        Severity = packet.Severity
+                    });
+                }
+                catch (Exception ex) { Logger.Debug($"Attack event handler failed: {ex.Message}"); }
+            }
+
+            // 顺手做一次过期清理（低频触发：每 100 条一次）
+            if (_suspiciousPackets.Count % 100 == 0)
+            {
+                try { CleanupStaleTrackers(); } catch { }
             }
 
             Logger.Warning($"[SECURITY] {packet.ThreatType} from {packet.SourceIP}: {packet.Description}");
@@ -445,13 +545,27 @@ namespace HardwareDiagnostics.Security
 
         private IPAddress GetLocalIPAddress()
         {
-            var host = Dns.GetHostEntry(Dns.GetHostName());
-            foreach (var ip in host.AddressList)
+            try
             {
-                if (ip.AddressFamily == AddressFamily.InterNetwork)
+                var host = Dns.GetHostEntry(Dns.GetHostName());
+                foreach (var ip in host.AddressList)
                 {
-                    return ip;
+                    if (ip.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(ip))
+                    {
+                        return ip;
+                    }
                 }
+                foreach (var ip in host.AddressList)
+                {
+                    if (ip.AddressFamily == AddressFamily.InterNetwork)
+                    {
+                        return ip;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug($"GetLocalIPAddress failed: {ex.Message}");
             }
             return IPAddress.Parse("127.0.0.1");
         }
@@ -514,11 +628,13 @@ namespace HardwareDiagnostics.Security
         public int SynCount { get; set; }
         public int AckCount { get; set; }
         public DateTime LastSynTime { get; set; }
+        public DateTime LastSeen { get; set; } = DateTime.Now;
 
         public void AddConnection(string destIP, DateTime time)
         {
             UniqueDestinations.Add(destIP);
             _connectionTimes.Add(time);
+            LastSeen = time;
 
             // 清理旧数据
             var cutoff = time.AddMinutes(-1);
