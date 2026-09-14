@@ -31,6 +31,9 @@ namespace HardwareDiagnostics.UI
         private StatusStrip _statusStrip;
         private ToolStripStatusLabel _memoryStatusLabel;
         private ToolStripStatusLabel _statusLabel;
+        private NotifyIcon? _trayIcon;
+        private PerformanceWidget? _widget;
+        private bool _allowExit;
 
         public MainForm()
         {
@@ -46,9 +49,81 @@ namespace HardwareDiagnostics.UI
             InitializeComponent();
             SetupUI();
             ApplyLanguage();
+            SetupTrayIcon();
+            ApplyStartupSettings();
 
             // 启动内存优化
             MemoryOptimizer.StartMonitoring();
+        }
+
+        /// <summary>托盘图标：双击还原，右键退出；气泡受设置开关控制。</summary>
+        private void SetupTrayIcon()
+        {
+            _trayIcon = new NotifyIcon
+            {
+                Text = "硬件检测与系统维护工具",
+                Icon = SystemIcons.Application,
+                Visible = true
+            };
+            _trayIcon.DoubleClick += (s, e) => RestoreFromTray();
+            var menu = new ContextMenuStrip();
+            menu.Items.Add("还原窗口", null, (s, e) => RestoreFromTray());
+            menu.Items.Add("桌面小组件", null, (s, e) => ToggleWidget());
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("退出", null, (s, e) => { _allowExit = true; Close(); });
+            _trayIcon.ContextMenuStrip = menu;
+        }
+
+        private void ApplyStartupSettings()
+        {
+            var s = AppSettings.Current;
+            if (s.ShowWidgetOnStart)
+                ToggleWidget();
+            if (s.StartMinimized)
+            {
+                WindowState = FormWindowState.Minimized;
+                Hide();
+                ShowTrayBalloon("已最小化到托盘", "双击托盘图标可还原窗口。");
+            }
+        }
+
+        private void RestoreFromTray()
+        {
+            Show();
+            WindowState = FormWindowState.Normal;
+            Activate();
+        }
+
+        public void ShowTrayBalloon(string title, string message)
+        {
+            try
+            {
+                if (_trayIcon != null && AppSettings.Current.EnableTrayBalloon)
+                    _trayIcon.ShowBalloonTip(3000, title, message, ToolTipIcon.Info);
+            }
+            catch { }
+        }
+
+        public void ToggleWidget()
+        {
+            try
+            {
+                if (_widget == null || _widget.IsDisposed)
+                {
+                    _widget = new PerformanceWidget();
+                    _widget.FormClosed += (s, e) => _widget = null;
+                    _widget.Show();
+                }
+                else
+                {
+                    _widget.Close();
+                    _widget = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"小组件启动失败：{ex.Message}");
+            }
         }
 
         private void InitializeComponent()
@@ -631,15 +706,16 @@ namespace HardwareDiagnostics.UI
             var layout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                RowCount = 5,
+                RowCount = 6,
                 ColumnCount = 3,
                 Padding = new Padding(5)
             };
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 17));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 17));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 17));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 17));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 16));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 16));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 34));
@@ -753,9 +829,9 @@ namespace HardwareDiagnostics.UI
                 BackColor = Color.LightGray
             };
             btnTerminal.Click += async (s, e) => { await LaunchAdminTerminal(); };
-            layout.Controls.Add(btnTerminal, 2, 2);
+            layout.Controls.Add(btnTerminal, 1, 4);
 
-            // 安全中心按钮
+            // 安全中心按钮（修复：原先放在不存在的第 4 列导致不可见）
             var btnSecurity = new Button
             {
                 Text = "安全中心 🔒",
@@ -768,7 +844,7 @@ namespace HardwareDiagnostics.UI
                 using var form = new SecurityCenterForm();
                 form.ShowDialog(this);
             };
-            layout.Controls.Add(btnSecurity, 3, 2);
+            layout.Controls.Add(btnSecurity, 2, 2);
 
             // 下载管理器按钮
             var btnDownloadManager = new Button
@@ -825,6 +901,32 @@ namespace HardwareDiagnostics.UI
                 form.ShowDialog(this);
             };
             layout.Controls.Add(btnSystemCleaner, 0, 4);
+
+            // 桌面小组件按钮
+            var btnWidget = new Button
+            {
+                Text = "桌面小组件 📊",
+                Dock = DockStyle.Fill,
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold),
+                BackColor = Color.Lavender
+            };
+            btnWidget.Click += (s, e) => ToggleWidget();
+            layout.Controls.Add(btnWidget, 2, 4);
+
+            // 设置按钮
+            var btnSettings = new Button
+            {
+                Text = "设置 ⚙️",
+                Dock = DockStyle.Fill,
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold),
+                BackColor = Color.WhiteSmoke
+            };
+            btnSettings.Click += (s, e) =>
+            {
+                using var form = new SettingsForm();
+                form.ShowDialog(this);
+            };
+            layout.Controls.Add(btnSettings, 0, 5);
 
             page.Controls.Add(layout);
             return page;
@@ -1299,9 +1401,29 @@ namespace HardwareDiagnostics.UI
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            // 关闭时最小化到托盘（设置可关）：用户点 X 只隐藏，托盘右键退出才是真退出
+            if (!_allowExit && e.CloseReason == CloseReason.UserClosing && AppSettings.Current.MinimizeToTray)
+            {
+                e.Cancel = true;
+                Hide();
+                ShowTrayBalloon("仍在后台运行", "程序已最小化到托盘，右键托盘图标可退出。");
+                return;
+            }
+
             _appCrashMonitor.Dispose();
             _bsodDetector.Dispose();
             MemoryOptimizer.StopMonitoring();
+            try
+            {
+                if (_trayIcon != null)
+                {
+                    _trayIcon.Visible = false;
+                    _trayIcon.Dispose();
+                    _trayIcon = null;
+                }
+            }
+            catch { }
+            try { _widget?.Close(); } catch { }
             base.OnFormClosing(e);
         }
     }

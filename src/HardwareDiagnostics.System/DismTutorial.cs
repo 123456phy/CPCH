@@ -470,6 +470,192 @@ DISM = 工程队：先把蓝图本身（组件存储）修好，再让 SFC 进�
                     Prerequisites = "确认没有正在进行的挂载提交；管理员权限。",
                     ExampleOutput = "提示清理完成，再重新挂载一般就顺了。",
                     Recovery = "只做清理；镜像坏了还是坏了，别指望它修镜像。"
+                },
+                // ---------- 功能包 Capabilities（微软官方文档口径，Win10/11 桌面版） ----------
+                new DismTutorialItem
+                {
+                    Category = "功能包管理",
+                    Title = "看看能装哪些功能包（语言/.NET/SSH 都在这）",
+                    Command = "/Online /Get-Capabilities /Format:Table",
+                    Description = "像看自助餐厅菜单：语言包、.NET、OpenSSH、手写识别都叫 Capability，不用记版本号就能点菜，DISM 会自己找最新版。",
+                    Usage = "适用于：装 OpenSSH、加语言、查某个包到底装上没。",
+                    Duration = "1-3 分钟",
+                    RiskLevel = "低风险",
+                    Prerequisites = "管理员权限；Win10/11 桌面版（家庭/专业/企业/教育）。",
+                    ExampleOutput = "表格列出包名（如 OpenSSH.Client~~~~0.0.1.0）与状态（已安装/不存在）。",
+                    Recovery = "只读查询。"
+                },
+                new DismTutorialItem
+                {
+                    Category = "功能包管理",
+                    Title = "查单个功能包的底细",
+                    Command = "/Online /Get-CapabilityInfo /CapabilityName:OpenSSH.Client~~~~0.0.1.0",
+                    Description = "像看菜品详情：这个包多大、什么状态、从哪下载，一目了然。",
+                    Usage = "适用于：安装前确认包名没抄错、看下载大小。",
+                    Duration = "1 分钟",
+                    RiskLevel = "低风险",
+                    Prerequisites = "包名从 /Get-Capabilities 完整复制，~~~~ 不能少。",
+                    ExampleOutput = "显示名称、状态、下载大小；状态“不存在”=还没装。",
+                    Recovery = "只读查询。"
+                },
+                new DismTutorialItem
+                {
+                    Category = "功能包管理",
+                    Title = "一键装 OpenSSH 客户端（入门首练）",
+                    Command = "/Online /Add-Capability /CapabilityName:OpenSSH.Client~~~~0.0.1.0",
+                    Description = "像点一份招牌菜：ssh 命令装完就能连 Linux 服务器。微软官方文档的示例就是拿语言包/SSH 这类包演示的。",
+                    Usage = "适用于：程序员连服务器、替代 PuTTY。没网就加 /Source:\\\\server\\share /LimitAccess 走内网源。",
+                    Duration = "2-10 分钟",
+                    RiskLevel = "低风险",
+                    Prerequisites = "管理员权限；联网（或配好内网源）；记住源查找顺序：/Source → 组策略 → Windows Update。",
+                    ExampleOutput = "成功提示完成；失败多为没网或被组策略禁了，看 dism.log。",
+                    Recovery = "/Remove-Capability 同名卸掉即可。"
+                },
+                new DismTutorialItem
+                {
+                    Category = "功能包管理",
+                    Title = "移除不用的功能包",
+                    Command = "/Online /Remove-Capability /CapabilityName:Language.Basic~~~en-US~0.0.1.0",
+                    Description = "像退掉点错的菜：多装的语言包、手写包可以退，一次还能退多个（写多个 /CapabilityName）。",
+                    Usage = "适用于：C 盘减肥、删多余语言。先 /Get-Capabilities 确认包名。",
+                    Duration = "2-10 分钟",
+                    RiskLevel = "低风险",
+                    Prerequisites = "确认该包没被系统/软件依赖（如正在用的显示语言别删）。",
+                    ExampleOutput = "提示成功；对应功能（如该语言输入）消失即生效。",
+                    Recovery = "/Add-Capability 装回来。"
+                },
+                // ---------- 版本 Edition（微软官方文档口径） ----------
+                new DismTutorialItem
+                {
+                    Category = "版本管理",
+                    Title = "查当前是什么版本（家庭/专业/评估版）",
+                    Command = "/Online /Get-CurrentEdition",
+                    Description = "像看房产证：缩写 Professional=专业版，ServerDatacenterEval=数据中心评估版，带 Eval 就是试用版。",
+                    Usage = "适用于：评估版转正前确认、重装前对账、找客服先报版本。",
+                    Duration = "1 分钟",
+                    RiskLevel = "低风险",
+                    Prerequisites = "管理员权限即可。",
+                    ExampleOutput = "Current Edition : Professional（示例）。",
+                    Recovery = "只读查询。"
+                },
+                new DismTutorialItem
+                {
+                    Category = "版本管理",
+                    Title = "查能升到哪些版本（转正前必看）",
+                    Command = "/Online /Get-TargetEditions",
+                    Description = "像问售楼处能换多大户型：列表里有的才能转，没有就只能重装。只能往高转，不能降级。",
+                    Usage = "适用于：家庭版升专业版、评估版转正式版、Server 转正。",
+                    Duration = "1 分钟",
+                    RiskLevel = "低风险",
+                    Prerequisites = "先 /Get-CurrentEdition；微软规则：已转过高版本的镜像不要再转，从家族最低版本起转。",
+                    ExampleOutput = "Target Edition : Professional 等；空列表=没处可升。",
+                    Recovery = "只读查询；真要转配合 /Set-Edition + 密钥（高风险，另查场景）。"
+                },
+                new DismTutorialItem
+                {
+                    Category = "版本管理",
+                    Title = "换产品密钥",
+                    Command = "/Online /Set-ProductKey:XXXXX-XXXXX-XXXXX-XXXXX-XXXXX",
+                    Description = "像换门锁钥匙：评估版转正、换批量授权 Key 都用它，换完一般要重启+联网激活。",
+                    Usage = "适用于：评估版到期转正、密钥变更。转版本用 /Set-Edition:<目标> /ProductKey:<Key> /AcceptEula。",
+                    Duration = "2-5 分钟 + 重启",
+                    RiskLevel = "中风险 - Key 不对版本会失败；域控机禁转评估版",
+                    Prerequisites = "密钥版本与目标版本匹配；先 /Get-TargetEditions 确认可转；域控制器不要转评估版（微软明确禁止）。",
+                    ExampleOutput = "成功后重启，用 slmgr.vbs /dlv 验证激活。",
+                    Recovery = "换错 Key 可重换正确的；转版失败一般不破坏系统，重跑对的命令。"
+                },
+                // ---------- 预配应用 Appx（微软官方文档口径） ----------
+                new DismTutorialItem
+                {
+                    Category = "应用管理",
+                    Title = "查新用户会预装哪些应用",
+                    Command = "/Online /Get-ProvisionedAppxPackages",
+                    Description = "像看交房标配清单：这里列的是“每个新用户都会自动装”的应用，和你当前账户装了啥是两回事。",
+                    Usage = "适用于：精简系统、sysprep 封装前清理、新用户抱怨应用太多。",
+                    Duration = "1-3 分钟",
+                    RiskLevel = "低风险",
+                    Prerequisites = "管理员权限；记下 DisplayName/包全名，后续移除要用。",
+                    ExampleOutput = "逐个列出预配包名；商店、Xbox、Clipchamp 等常在其中。",
+                    Recovery = "只读查询。"
+                },
+                new DismTutorialItem
+                {
+                    Category = "应用管理",
+                    Title = "取消某个应用的预配（新用户不再装）",
+                    Command = "/Online /Remove-ProvisionedAppxPackage /PackageName:Microsoft.XboxApp_xxxx_neutral_~_8wekyb3d8bbwe",
+                    Description = "像跟物业说以后交房别配这件家具：只管“未来的新用户”，已经住进来（现有账户）的要用 PowerShell 的 Remove-AppxPackage 再删一遍，否则删不干净——这是微软官方文档原话强调的坑。",
+                    Usage = "适用于：封装母盘、公司统一镜像去 Xbox/游戏等。包名从上一条完整复制。",
+                    Duration = "2-5 分钟",
+                    RiskLevel = "中风险 - 删错系统关键预配包（如商店）会影响功能",
+                    Prerequisites = "Server Core 需桌面体验；删前确认包名；现有用户另跑 Remove-AppxPackage。",
+                    ExampleOutput = "提示成功；新建测试账户验证该应用不再出现。",
+                    Recovery = "去应用商店重装；大不了 /RestoreHealth 修一轮。"
+                },
+                // ---------- 映像导出与拆分（微软 Image Management 口径） ----------
+                new DismTutorialItem
+                {
+                    Category = "高级操作",
+                    Title = "查哪些映像正挂着（卡死先看它）",
+                    Command = "/Get-MountedImageInfo",
+                    Description = "像查停车场：谁占着 C:\\Mount、挂了多久、有没有读/写，一目了然，挂载报错先看这张表。",
+                    Usage = "适用于：卸载失败、目录删不掉、wim 被占用时定位。",
+                    Duration = "1 分钟",
+                    RiskLevel = "低风险",
+                    Prerequisites = "管理员权限即可。",
+                    ExampleOutput = "列出挂载目录、镜像文件、状态；空表=没挂载。",
+                    Recovery = "只读查询；有僵尸挂载用 /Remount 或 /Cleanup-Mountpoints。"
+                },
+                new DismTutorialItem
+                {
+                    Category = "高级操作",
+                    Title = "挂载异常？重新挂一次",
+                    Command = "/Remount-Image /MountDir:C:\\Mount",
+                    Description = "像车熄火了重新打火：上次断电/崩溃留下的半截挂载，先 Remount 救，再决定提交还是放弃。",
+                    Usage = "适用于：卸载报错、提交中断后的抢救。",
+                    Duration = "2-10 分钟",
+                    RiskLevel = "低风险",
+                    Prerequisites = "确认没有别的进程正在提交同一挂载点。",
+                    ExampleOutput = "提示成功即可继续 /Commit 或 /Discard。",
+                    Recovery = "救不回来就 /Discard + 备份覆盖 + /Cleanup-Mountpoints。"
+                },
+                new DismTutorialItem
+                {
+                    Category = "高级操作",
+                    Title = "只保存不卸载（中场存档）",
+                    Command = "/Commit-Image /MountDir:C:\\Mount",
+                    Description = "像游戏里按 F5 存档：把改动写回 wim 但保持挂载，改了一半想保险就先存一次，再接着改。",
+                    Usage = "适用于：长时间定制镜像中途防断电丢活。",
+                    Duration = "5-20 分钟",
+                    RiskLevel = "低风险",
+                    Prerequisites = "磁盘空间够写回；提交中别关机。",
+                    ExampleOutput = "提示提交成功，挂载还在，可继续改，最后再 /Unmount /Commit 或 /Discard。",
+                    Recovery = "存档本身就是保险；改崩了 /Discard 回滚到上次存档。"
+                },
+                new DismTutorialItem
+                {
+                    Category = "高级操作",
+                    Title = "只导出要的版本（wim 瘦身）",
+                    Command = "/Export-Image /SourceImageFile:X:\\sources\\install.wim /SourceIndex:2 /DestinationImageFile:D:\\pro-only.wim /Compress:max /CheckIntegrity",
+                    Description = "像从拼盘里只夹爱吃的菜：原 ISO 里家庭+专业好几个 Index，只导出专业版，文件小一半。/Compress:max 最省空间，/CheckIntegrity 防拷出来是坏的。",
+                    Usage = "适用于：做精简启动盘、只要单版本、U 盘装不下时先瘦身。",
+                    Duration = "5-20 分钟",
+                    RiskLevel = "低风险",
+                    Prerequisites = "先 /Get-ImageInfo 确认 Index 号；目标盘空间充足。",
+                    ExampleOutput = "提示导出成功，新 wim 只有单 Index。",
+                    Recovery = "只读原文件；导坏了删了重导。"
+                },
+                new DismTutorialItem
+                {
+                    Category = "高级操作",
+                    Title = "wim 太大拷不进 U 盘？切成 swm",
+                    Command = "/Split-Image /ImageFile:D:\\pro-only.wim /SWMFile:E:\\install.swm /FileSize:3800",
+                    Description = "像把行李箱拆成小包：FAT32 U 盘单文件不能超 4GB，切成 3800MB 一片的 swm，装机时 setup 自动拼回去。",
+                    Usage = "适用于：UEFI 启动盘（必须 FAT32）+ 镜像超 4GB。/FileSize 单位 MB，一般填 3800。",
+                    Duration = "5-20 分钟",
+                    RiskLevel = "低风险",
+                    Prerequisites = "目标盘空间够；swm 要和 setup.exe 放同一 sources 目录。",
+                    ExampleOutput = "生成 install.swm、install2.swm…… 装机自动识别。",
+                    Recovery = "原 wim 还在；切坏了删 swm 重切。"
                 }
             };
         }

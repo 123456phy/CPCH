@@ -91,10 +91,29 @@ namespace HardwareDiagnostics.UI
             });
             commandPanel.TabPages.Add(advancedPage);
 
+            // 功能包与版本标签页（微软官方文档口径：Capabilities / Edition / Appx / 映像导出拆分）
+            var packagePage = CreateCommandPage(new List<DismCommandItem>
+            {
+                new DismCommandItem("功能包列表", async (p) => await _dismManager.GetCapabilitiesAsync(p)),
+                new DismCommandItem("装OpenSSH", async (p) => await ConfirmAndRun(p, "安装 OpenSSH 客户端功能包？", () => _dismManager.AddOpenSshClientAsync(p))),
+                new DismCommandItem("查功能包", async (p) => await WithInputAsync(p, "查询功能包", "输入功能包名（如 OpenSSH.Client~~~~0.0.1.0）：", "OpenSSH.Client~~~~0.0.1.0", (name, pp) => _dismManager.GetCapabilityInfoAsync(name, pp))),
+                new DismCommandItem("删功能包", async (p) => await WithInputAsync(p, "移除功能包", "输入要移除的功能包名：", "", (name, pp) => _dismManager.RemoveCapabilityAsync(name, pp), true)),
+                new DismCommandItem("查当前版本", async (p) => await _dismManager.GetCurrentEditionAsync(p)),
+                new DismCommandItem("查可升版本", async (p) => await _dismManager.GetTargetEditionsAsync(p)),
+                new DismCommandItem("查预配应用", async (p) => await _dismManager.GetProvisionedAppxPackagesAsync(p)),
+                new DismCommandItem("查已挂载", async (p) => await _dismManager.GetMountedImageInfoAsync(p)),
+                new DismCommandItem("重新挂载", async (p) => await RemountWithDialog(p)),
+                new DismCommandItem("提交修改", async (p) => await CommitWithDialog(p)),
+                new DismCommandItem("导出映像", async (p) => await ExportImageWithDialog(p)),
+                new DismCommandItem("拆分映像", async (p) => await SplitImageWithDialog(p))
+            });
+            commandPanel.TabPages.Add(packagePage);
+
             maintenancePage.Text = "系统维护";
             featurePage.Text = "功能管理";
             driverPage.Text = "驱动管理";
             advancedPage.Text = "高级命令";
+            packagePage.Text = "功能包与版本";
 
             layout.Controls.Add(commandPanel, 0, 0);
 
@@ -188,6 +207,11 @@ namespace HardwareDiagnostics.UI
 
                 _outputTextBox.AppendText($"操作{(result.Success ? "成功" : "失败")}，耗时: {result.Duration.TotalSeconds:F1}秒" + Environment.NewLine);
                 _statusLabel.Text = $"操作{(result.Success ? "成功" : "失败")}";
+                // 桌面弹窗提醒（长耗时命令跑完不用守着窗口；可在设置里关）
+                if (result.Success)
+                    ToastNotifier.Success("DISM 执行成功", $"操作成功，耗时 {result.Duration.TotalSeconds:F0} 秒。");
+                else
+                    ToastNotifier.Warning("DISM 执行失败", "详见输出窗口，必要时查看 dism.log。");
             }
             catch (Exception ex)
             {
@@ -195,7 +219,81 @@ namespace HardwareDiagnostics.UI
                 _progressBar.Value = 0;
                 _outputTextBox.AppendText($"执行异常: {ex.Message}" + Environment.NewLine);
                 _statusLabel.Text = "执行失败";
+                ToastNotifier.Error("DISM 执行异常", ex.Message);
             }
+        }
+
+        /// <summary>中高风险操作先确认再跑。</summary>
+        private async Task<DismOperationResult> ConfirmAndRun(IProgress<string> progress, string tip, Func<Task<DismOperationResult>> action)
+        {
+            var r = MessageBox.Show(this, tip, "请确认", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (r != DialogResult.Yes)
+                return new DismOperationResult { Success = false, Error = "用户取消" };
+            return await action();
+        }
+
+        /// <summary>需要手工输参数的命令：弹输入框拿参数再跑。</summary>
+        private async Task<DismOperationResult> WithInputAsync(IProgress<string> progress, string title, string label, string defaultValue, Func<string, IProgress<string>, Task<DismOperationResult>> action, bool confirm = false)
+        {
+            string? input = InputDialog.Show(title, label, defaultValue);
+            if (string.IsNullOrWhiteSpace(input))
+                return new DismOperationResult { Success = false, Error = "用户取消" };
+            if (confirm)
+            {
+                var r = MessageBox.Show(this, $"确定要执行吗？\n{input}", "请确认", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (r != DialogResult.Yes)
+                    return new DismOperationResult { Success = false, Error = "用户取消" };
+            }
+            return await action(input, progress);
+        }
+
+        private async Task<DismOperationResult> RemountWithDialog(IProgress<string> progress)
+        {
+            using var dialog = new FolderBrowserDialog { Description = "选择要重新挂载的目录（如 C:\\Mount）" };
+            if (dialog.ShowDialog() == DialogResult.OK)
+                return await _dismManager.RemountImageAsync(dialog.SelectedPath, progress);
+            return new DismOperationResult { Success = false, Error = "用户取消" };
+        }
+
+        private async Task<DismOperationResult> CommitWithDialog(IProgress<string> progress)
+        {
+            using var dialog = new FolderBrowserDialog { Description = "选择要提交修改的挂载目录" };
+            if (dialog.ShowDialog() == DialogResult.OK)
+            {
+                var r = MessageBox.Show(this, "提交会把修改写回映像，中途断电可能损坏镜像。\n确定提交吗？",
+                    "请确认", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (r == DialogResult.Yes)
+                    return await _dismManager.CommitImageAsync(dialog.SelectedPath, progress);
+            }
+            return new DismOperationResult { Success = false, Error = "用户取消" };
+        }
+
+        private async Task<DismOperationResult> ExportImageWithDialog(IProgress<string> progress)
+        {
+            using var src = new OpenFileDialog { Filter = "映像文件|*.wim;*.esd|所有文件|*.*", Title = "选择源映像" };
+            if (src.ShowDialog() != DialogResult.OK)
+                return new DismOperationResult { Success = false, Error = "用户取消" };
+            string? idx = InputDialog.Show("导出映像", "源索引 Index（先用 /Get-ImageInfo 查）：", "1");
+            if (string.IsNullOrWhiteSpace(idx) || !int.TryParse(idx, out int index))
+                return new DismOperationResult { Success = false, Error = "用户取消" };
+            using var dst = new SaveFileDialog { Filter = "映像文件|*.wim|所有文件|*.*", Title = "保存为", FileName = "custom.wim" };
+            if (dst.ShowDialog() != DialogResult.OK)
+                return new DismOperationResult { Success = false, Error = "用户取消" };
+            return await _dismManager.ExportImageAsync(src.FileName, index, dst.FileName, progress);
+        }
+
+        private async Task<DismOperationResult> SplitImageWithDialog(IProgress<string> progress)
+        {
+            using var src = new OpenFileDialog { Filter = "映像文件|*.wim|所有文件|*.*", Title = "选择要拆分的 wim" };
+            if (src.ShowDialog() != DialogResult.OK)
+                return new DismOperationResult { Success = false, Error = "用户取消" };
+            using var dst = new SaveFileDialog { Filter = "拆分映像|*.swm|所有文件|*.*", Title = "第一个分片另存为", FileName = "install.swm" };
+            if (dst.ShowDialog() != DialogResult.OK)
+                return new DismOperationResult { Success = false, Error = "用户取消" };
+            string? size = InputDialog.Show("拆分映像", "每片大小 MB（FAT32 U 盘填 3800）：", "3800");
+            if (string.IsNullOrWhiteSpace(size) || !int.TryParse(size, out int mb) || mb <= 0)
+                return new DismOperationResult { Success = false, Error = "用户取消" };
+            return await _dismManager.SplitImageAsync(src.FileName, dst.FileName, mb, progress);
         }
 
         private async Task<DismOperationResult> ExportDriversWithDialog(IProgress<string> progress)

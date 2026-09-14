@@ -439,6 +439,131 @@ namespace HardwareDiagnostics.System
 
         #endregion
 
+        #region 功能包 Capabilities（微软官方文档口径）
+        // 文档：DISM Capabilities Package Servicing Command-Line Options
+        // 要点：每个命令必须带 /Online 或 /Image；/Source 可多个；/LimitAccess 禁止联网找源。
+        // 源查找顺序：/Source 指定位置 → 组策略位置 → Windows Update（在线且无 /LimitAccess 时）。
+
+        public async Task<DismOperationResult> GetCapabilitiesAsync(IProgress<string>? progress = null)
+        {
+            progress?.Report("正在获取功能包（Capabilities）列表...");
+            return await ExecuteCommandAsync("/Online /Get-Capabilities /Format:Table", progress);
+        }
+
+        public async Task<DismOperationResult> GetCapabilityInfoAsync(string capabilityName, IProgress<string>? progress = null)
+        {
+            progress?.Report($"正在获取功能包信息: {capabilityName}");
+            return await ExecuteCommandAsync($"/Online /Get-CapabilityInfo /CapabilityName:{capabilityName}", progress);
+        }
+
+        public async Task<DismOperationResult> AddCapabilityAsync(string capabilityName, string? sourcePath = null, bool limitAccess = false, IProgress<string>? progress = null)
+        {
+            progress?.Report($"正在安装功能包: {capabilityName}");
+            var args = new StringBuilder($"/Online /Add-Capability /CapabilityName:{capabilityName}");
+            if (!string.IsNullOrWhiteSpace(sourcePath))
+                args.Append($" /Source:{sourcePath}");
+            if (limitAccess)
+                args.Append(" /LimitAccess");
+            return await ExecuteCommandAsync(args.ToString(), progress);
+        }
+
+        /// <summary>一键安装 OpenSSH 客户端（最常用的 Capability 入门示例）。</summary>
+        public async Task<DismOperationResult> AddOpenSshClientAsync(IProgress<string>? progress = null)
+        {
+            return await AddCapabilityAsync("OpenSSH.Client~~~~0.0.1.0", null, false, progress);
+        }
+
+        public async Task<DismOperationResult> RemoveCapabilityAsync(string capabilityName, IProgress<string>? progress = null)
+        {
+            progress?.Report($"正在移除功能包: {capabilityName}");
+            return await ExecuteCommandAsync($"/Online /Remove-Capability /CapabilityName:{capabilityName}", progress);
+        }
+
+        #endregion
+
+        #region 版本 Edition（微软官方文档口径）
+        // 文档：DISM Windows Edition-Servicing Command-Line Options
+        // 在线可用：/Get-CurrentEdition /Get-TargetEditions /Set-ProductKey /Set-Edition（在线转高版本需 /AcceptEula + /ProductKey）。
+        // 规则：只能往高版本转，不能降级；已转过的镜像不要再转，建议从家族最低版本起转。
+
+        public async Task<DismOperationResult> GetCurrentEditionAsync(IProgress<string>? progress = null)
+        {
+            progress?.Report("正在获取当前系统版本...");
+            return await ExecuteCommandAsync("/Online /Get-CurrentEdition", progress);
+        }
+
+        public async Task<DismOperationResult> GetTargetEditionsAsync(IProgress<string>? progress = null)
+        {
+            progress?.Report("正在获取可转换的目标版本...");
+            return await ExecuteCommandAsync("/Online /Get-TargetEditions", progress);
+        }
+
+        public async Task<DismOperationResult> SetProductKeyAsync(string productKey, IProgress<string>? progress = null)
+        {
+            progress?.Report("正在设置产品密钥...");
+            return await ExecuteCommandAsync($"/Online /Set-ProductKey:{productKey}", progress);
+        }
+
+        #endregion
+
+        #region 预配应用 Appx（微软官方文档口径）
+        // 文档：DISM App Package (.appx or .appxbundle) Servicing Command-Line Options
+        // 注意：/Remove-ProvisionedAppxPackage 只取消“新用户的预配”，已注册到现有用户
+        // 的应用要用 PowerShell Remove-AppxPackage 逐个删，否则删不干净。
+
+        public async Task<DismOperationResult> GetProvisionedAppxPackagesAsync(IProgress<string>? progress = null)
+        {
+            progress?.Report("正在获取预配应用包列表...");
+            return await ExecuteCommandAsync("/Online /Get-ProvisionedAppxPackages", progress);
+        }
+
+        public async Task<DismOperationResult> RemoveProvisionedAppxPackageAsync(string packageName, IProgress<string>? progress = null)
+        {
+            progress?.Report($"正在取消预配应用: {packageName}");
+            return await ExecuteCommandAsync($"/Online /Remove-ProvisionedAppxPackage /PackageName:{packageName}", progress);
+        }
+
+        #endregion
+
+        #region 映像导出与拆分（微软官方 Image Management 口径）
+        // /Get-MountedImageInfo：查看当前挂载了哪些映像（卡死先看它）。
+        // /Remount-Image：挂载目录异常时重新挂载。
+        // /Commit-Image：保存挂载中的修改但不卸载（/Unmount /Commit 是一步到位版）。
+        // /Export-Image：把某个 Index 导出成新 wim（/Compress:max 最省，/CheckIntegrity 防烂盘）。
+        // /Split-Image：把大 wim 按 /FileSize(MB) 切成 swm（FAT32 U 盘装机必备，单文件超 4GB 时）。
+
+        public async Task<DismOperationResult> GetMountedImageInfoAsync(IProgress<string>? progress = null)
+        {
+            progress?.Report("正在获取已挂载映像信息...");
+            return await ExecuteCommandAsync("/Get-MountedImageInfo", progress);
+        }
+
+        public async Task<DismOperationResult> RemountImageAsync(string mountDir, IProgress<string>? progress = null)
+        {
+            progress?.Report($"正在重新挂载映像: {mountDir}");
+            return await ExecuteCommandAsync($"/Remount-Image /MountDir:{mountDir}", progress);
+        }
+
+        public async Task<DismOperationResult> CommitImageAsync(string mountDir, IProgress<string>? progress = null)
+        {
+            progress?.Report($"正在提交挂载映像的修改: {mountDir}");
+            return await ExecuteCommandAsync($"/Commit-Image /MountDir:{mountDir}", progress);
+        }
+
+        public async Task<DismOperationResult> ExportImageAsync(string sourceImageFile, int sourceIndex, string destImageFile, IProgress<string>? progress = null)
+        {
+            progress?.Report($"正在导出映像索引 {sourceIndex} 到: {destImageFile}");
+            return await ExecuteCommandAsync($"/Export-Image /SourceImageFile:{sourceImageFile} /SourceIndex:{sourceIndex} /DestinationImageFile:{destImageFile} /Compress:max /CheckIntegrity", progress);
+        }
+
+        public async Task<DismOperationResult> SplitImageAsync(string imageFile, string swmFile, int fileSizeMB, IProgress<string>? progress = null)
+        {
+            progress?.Report($"正在拆分映像为 {fileSizeMB}MB 分片: {swmFile}");
+            return await ExecuteCommandAsync($"/Split-Image /ImageFile:{imageFile} /SWMFile:{swmFile} /FileSize:{fileSizeMB}", progress);
+        }
+
+        #endregion
+
         #region 快捷命令集合
 
         public async Task<DismOperationResult> QuickScanAndRepairAsync(IProgress<string>? progress = null)

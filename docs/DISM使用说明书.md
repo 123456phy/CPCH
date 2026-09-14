@@ -121,3 +121,74 @@ DISM /Cleanup-Mountpoints
 - **低风险**：查询类和常规修复/安全清理，放心跑。
 - **中风险**：加驱动、装功能/补丁、挂载——备份+还原点，错了能回。
 - **高风险**：`/ResetBase`、删驱动、提交镜像中途断电——拿不准先问人。
+
+---
+
+## 11. 功能包 Capabilities（Win10/11，微软官方文档口径）
+
+> 参考：[DISM Capabilities Package Servicing Command-Line Options](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/dism-capabilities-package-servicing-command-line-options)（Microsoft Learn）。
+> 概念：Capability 是“不指定版本号就要服务”的包类型（如语言、.NET、OpenSSH），DISM 会自动找最新版。
+> 铁律：每条命令必须带 `/Online` 或 `/Image:<路径>`；源查找顺序固定为 **`/Source` 指定位置 → 组策略位置 → Windows Update**（在线且无 `/LimitAccess` 时）。
+
+```cmd
+:: 查菜单（状态列：已安装 / 不存在）
+DISM /Online /Get-Capabilities
+:: 查菜品详情（包名里的 ~~~~ 一个都不能少）
+DISM /Online /Get-CapabilityInfo /CapabilityName:OpenSSH.Client~~~~0.0.1.0
+:: 点菜：装 OpenSSH 客户端（入门首练）
+DISM /Online /Add-Capability /CapabilityName:OpenSSH.Client~~~~0.0.1.0
+:: 内网机：走指定源且不许联网
+DISM /Online /Add-Capability /CapabilityName:Language.Basic~~~en-US~0.0.1.0 /Source:\\server\share /LimitAccess
+:: 退菜：一次可写多个 /CapabilityName
+DISM /Online /Remove-Capability /CapabilityName:Language.Basic~~~en-US~0.0.1.0
+```
+
+小白要点：`~~~~0.0.1.0` 是通配写法，照抄即可；装失败先看有没有被组策略禁、再看 dism.log。
+
+## 12. 版本 Edition（转正/升级，微软官方文档口径）
+
+> 参考：[DISM Windows Edition-Servicing Command-Line Options](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/dism-windows-edition-servicing-command-line-options)（Microsoft Learn）。
+> 在线可用：`/Get-CurrentEdition`、`/Get-TargetEditions`、`/Set-ProductKey`、`/Set-Edition`（在线转高版本必须同时 `/AcceptEula /ProductKey`）。
+> 三条红线：**只能往高转、不能降级**；已转过的镜像不要再转；从家族最低版本起转。**域控制器禁止把评估版转正式版**（先迁 FSMO，微软原话）。
+
+```cmd
+:: 看房产证（带 Eval = 试用版）
+DISM /Online /Get-CurrentEdition
+:: 问售楼处能换多大户型（列表里没有就只能重装）
+DISM /Online /Get-TargetEditions
+:: Server 评估版转正四步（先 GetEula 存协议看完，再 AcceptEula+Key 执行，完事重启）
+DISM /Online /Set-Edition:ServerDatacenter /GetEula:C:\license.rtf
+DISM /Online /Set-Edition:ServerDatacenter /ProductKey:XXXXX-XXXXX-XXXXX-XXXXX-XXXXX /AcceptEula
+```
+
+## 13. 预配应用 Appx（微软官方文档口径）
+
+> 参考：[DISM App Package Servicing Command-Line Options](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/dism-app-package--appx-or-appxbundle--servicing-command-line-options)（Microsoft Learn）。
+> 在线/离线都支持：`/Get-ProvisionedAppxPackages`、`/Add-ProvisionedAppxPackage`、`/Remove-ProvisionedAppxPackage`。
+> **官方强调的大坑**：`/Remove-ProvisionedAppxPackage` 只取消“新用户”的预配，已注册到现有用户的必须再用 PowerShell `Remove-AppxPackage` 逐个删，否则删不干净。
+
+```cmd
+:: 查交房标配（新用户会自动装的）
+DISM /Online /Get-ProvisionedAppxPackages
+:: 以后交房别配这件家具（包名从上一条完整复制）
+DISM /Online /Remove-ProvisionedAppxPackage /PackageName:Microsoft.XboxApp_xxx_neutral_~_8wekyb3d8bbwe
+# 现有账户再补一刀（PowerShell）：
+Get-AppxPackage *Xbox* | Remove-AppxPackage
+```
+
+## 14. 映像导出与拆分（Image Management 口径）
+
+```cmd
+:: 查停车场：谁占着挂载目录（卡死先看它）
+DISM /Get-MountedImageInfo
+:: 熄火重打：抢救半截挂载
+DISM /Remount-Image /MountDir:C:\Mount
+:: 中场存档：保存但不卸载，继续改
+DISM /Commit-Image /MountDir:C:\Mount
+:: 只夹爱吃的菜：多 Index 的 ISO 只导出专业版（/Compress:max 最省，/CheckIntegrity 防坏盘）
+DISM /Export-Image /SourceImageFile:X:\sources\install.wim /SourceIndex:2 /DestinationImageFile:D:\pro-only.wim /Compress:max /CheckIntegrity
+:: 拆行李：FAT32 U 盘单文件不超 4GB，切 3800MB 一片，setup 自动拼回
+DISM /Split-Image /ImageFile:D:\pro-only.wim /SWMFile:E:\install.swm /FileSize:3800
+```
+
+以上命令均已接入本程序：主界面 → DISM 快捷命令 → **“功能包与版本”选项卡**一键执行，`DismManager` 对应方法、`DismTutorial` 对应条目同步配套，程序内说明与本文档同口径。
