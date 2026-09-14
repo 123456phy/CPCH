@@ -928,6 +928,36 @@ namespace HardwareDiagnostics.UI
             };
             layout.Controls.Add(btnSettings, 0, 5);
 
+            // 还原点按钮
+            var btnRestorePoint = new Button
+            {
+                Text = "还原点 🛟",
+                Dock = DockStyle.Fill,
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold),
+                BackColor = Color.MistyRose
+            };
+            btnRestorePoint.Click += (s, e) =>
+            {
+                using var form = new RestorePointForm();
+                form.ShowDialog(this);
+            };
+            layout.Controls.Add(btnRestorePoint, 1, 5);
+
+            // 体检报告按钮
+            var btnHealthReport = new Button
+            {
+                Text = "体检报告 🩺",
+                Dock = DockStyle.Fill,
+                Font = new Font("Microsoft YaHei", 12F, FontStyle.Bold),
+                BackColor = Color.Honeydew
+            };
+            btnHealthReport.Click += (s, e) =>
+            {
+                using var form = new HealthReportForm();
+                form.ShowDialog(this);
+            };
+            layout.Controls.Add(btnHealthReport, 2, 5);
+
             page.Controls.Add(layout);
             return page;
         }

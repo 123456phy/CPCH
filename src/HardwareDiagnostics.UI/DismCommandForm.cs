@@ -12,6 +12,7 @@ namespace HardwareDiagnostics.UI
     public partial class DismCommandForm : Form
     {
         private readonly DismManager _dismManager;
+        private readonly SfcManager _sfcManager;
         private TextBox _outputTextBox;
         private ProgressBar _progressBar;
         private Label _statusLabel;
@@ -19,6 +20,7 @@ namespace HardwareDiagnostics.UI
         public DismCommandForm()
         {
             _dismManager = new DismManager();
+            _sfcManager = new SfcManager();
             InitializeComponent();
         }
 
@@ -53,7 +55,10 @@ namespace HardwareDiagnostics.UI
                 new DismCommandItem("分析组件", async (p) => await _dismManager.AnalyzeComponentStoreAsync(p)),
                 new DismCommandItem("清理组件", async (p) => await _dismManager.StartComponentCleanupAsync(p)),
                 new DismCommandItem("深度清理", async (p) => await _dismManager.DeepCleanupAsync(p)),
-                new DismCommandItem("重置基础", async (p) => await _dismManager.StartComponentCleanupResetBaseAsync(p))
+                new DismCommandItem("重置基础", async (p) => await _dismManager.StartComponentCleanupResetBaseAsync(p)),
+                // SFC 是 DISM 修完蓝图后的验墙步骤，放一起最顺手；原理见 SfcManager.GetPrinciple()
+                new DismCommandItem("SFC只检查", async (p) => await _sfcManager.VerifyOnlyAsync(p)),
+                new DismCommandItem("SFC修复", async (p) => await _sfcManager.ScanNowAsync(p))
             });
             commandPanel.TabPages.Add(maintenancePage);
 

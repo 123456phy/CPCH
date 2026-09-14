@@ -192,3 +192,41 @@ DISM /Split-Image /ImageFile:D:\pro-only.wim /SWMFile:E:\install.swm /FileSize:3
 ```
 
 以上命令均已接入本程序：主界面 → DISM 快捷命令 → **“功能包与版本”选项卡**一键执行，`DismManager` 对应方法、`DismTutorial` 对应条目同步配套，程序内说明与本文档同口径。
+
+---
+
+## 附：SFC 手册（DISM 修完必须验墙，不看这章前面白修）
+
+SFC（System File Checker）= 墙面质检员：拿每个系统文件的指纹（哈希）和蓝图仓库（WinSxS）里的正版指纹比对，对不上就覆盖。只动系统文件，不动个人文件。
+
+```cmd
+:: 先只看不动（几分钟，零风险）
+sfc /verifyonly
+:: 再动手修（10-30 分钟，管理员权限，卡住正常）
+sfc /scannow
+```
+
+结论翻译（本程序会自动判读，这里教你人肉判读）：
+
+| 看到这句话 | 意思 | 下一步 |
+|---|---|---|
+| Windows 资源保护找到了损坏文件并成功修复 | 修好了 | 重启观察 |
+| 未发现完整性冲突 | 没病 | 收工 |
+| 找到了损坏文件但无法修复 | 仓库先坏了，SFC 无米下锅 | 回头跑 DISM /RestoreHealth，再跑 sfc |
+| 无法执行请求的操作 | 权限不够 | 右键以管理员身份运行 |
+
+明细日志：`C:\Windows\Logs\CBS\CBS.log`（求助时和 dism.log 一起打包，见本程序“体检报告”）。
+
+## 附：还原点三板斧（动手术前先按快门）
+
+还原点 = 系统的快照（系统文件+注册表+已装程序状态），卷影复制（VSS）实现。只保系统不保个人文件；占系统盘空间，太满/太老会被自动删。
+
+```powershell
+# 管理员 PowerShell，顺序照敲：
+Enable-ComputerRestore -Drive 'C:\'
+Checkpoint-Computer -Description '动手术前' -RestorePointType 'MODIFY_SETTINGS'
+Get-ComputerRestorePoint | Select-Object SequenceNumber,Description,CreationTime
+rstrui.exe   # 真出事了，打开它选个点回去
+```
+
+本程序“还原点 🛟”窗干的就是这四件事，顶部有原理、每步可复制命令——点一遍，下次自己敲。
